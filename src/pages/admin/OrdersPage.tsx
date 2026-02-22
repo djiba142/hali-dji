@@ -20,7 +20,8 @@ import {
 } from "@/components/ui/select";
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, CheckCircle, XCircle, Clock, Truck, FileText, Eye, Building2, Calendar, MapPin } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle, Clock, Truck, Eye, Building2, Calendar, MapPin, Settings2, PackageCheck } from 'lucide-react';
+
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import {
@@ -42,8 +43,9 @@ interface Order {
     priorite: string;
     statut: string;
     notes: string | null;
+    entreprise_id: string | null;
     entreprise: { nom: string; sigle: string } | null;
-    station: { nom: string; ville: string } | null;
+    station: { nom: string; ville: string; entreprise: { nom: string; sigle: string } | null } | null;
 }
 
 const statusColors: Record<string, string> = {
@@ -90,12 +92,12 @@ export default function OrdersPage() {
                 .select(`
           *,
           entreprise:entreprises(nom, sigle),
-          station:stations(nom, ville)
+          station:stations(nom, ville, entreprise:entreprises(nom, sigle))
         `)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
-            setOrders(data || []);
+            setOrders((data as unknown as Order[]) || []);
         } catch (error) {
             console.error('Error fetching orders:', error);
         } finally {
@@ -129,6 +131,10 @@ export default function OrdersPage() {
     const filteredOrders = filterStatus === 'all'
         ? orders
         : orders.filter(o => o.statut === filterStatus);
+
+    // Retourne l'entreprise de la commande : directe (entreprise_id) OU via station
+    const getEntreprise = (order: Order) =>
+        order.entreprise || order.station?.entreprise || null;
 
     if (loading) {
         return (
@@ -188,13 +194,22 @@ export default function OrdersPage() {
                                             {format(new Date(order.created_at), 'dd/MM/yyyy HH:mm')}
                                         </TableCell>
                                         <TableCell>
-                                            <div className="flex flex-col">
-                                                <span className="font-semibold">{order.entreprise?.sigle || 'N/A'}</span>
-                                                <span className="text-xs text-muted-foreground">
-                                                    {order.station ? order.station.nom : '🏢 Stock Central'}
+                                            <div className="flex flex-col gap-0.5">
+                                                <span className="font-semibold text-primary">
+                                                    {getEntreprise(order)?.nom || 'Entreprise inconnue'}
+                                                    {getEntreprise(order)?.sigle && (
+                                                        <span className="ml-1 text-xs text-muted-foreground font-normal">
+                                                            ({getEntreprise(order)!.sigle})
+                                                        </span>
+                                                    )}
+                                                </span>
+                                                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                                    <MapPin className="h-3 w-3" />
+                                                    {order.station ? order.station.nom : 'Dépôt central'}
                                                 </span>
                                             </div>
                                         </TableCell>
+
                                         <TableCell className="capitalize">{order.carburant}</TableCell>
                                         <TableCell>{order.quantite_demandee.toLocaleString()} L</TableCell>
                                         <TableCell>
@@ -208,7 +223,8 @@ export default function OrdersPage() {
                                             </span>
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            <div className="flex justify-end gap-2">
+                                            <div className="flex justify-end items-center gap-2">
+                                                {/* Bouton Voir Détails */}
                                                 <Button
                                                     size="sm"
                                                     variant="ghost"
@@ -221,43 +237,43 @@ export default function OrdersPage() {
                                                 >
                                                     <Eye className="h-4 w-4" />
                                                 </Button>
-                                                {order.statut === 'en_attente' && (
-                                                    <>
-                                                        <Button
-                                                            size="sm"
-                                                            variant="default"
-                                                            className="bg-green-600 hover:bg-green-700 h-8 w-8 p-0"
-                                                            onClick={() => updateStatus(order.id, 'approuve')}
-                                                            title="Approuver"
-                                                        >
-                                                            <CheckCircle className="h-4 w-4" />
-                                                        </Button>
-                                                        <Button
-                                                            size="sm"
-                                                            variant="destructive"
-                                                            className="h-8 w-8 p-0"
-                                                            onClick={() => updateStatus(order.id, 'annule')}
-                                                            title="Refuser"
-                                                        >
-                                                            <XCircle className="h-4 w-4" />
-                                                        </Button>
-                                                    </>
-                                                )}
-                                                {order.statut === 'approuve' && (
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        className="h-8 gap-2"
-                                                        onClick={() => updateStatus(order.id, 'en_cours')}
-                                                    >
-                                                        <Truck className="h-3 w-3" /> Expédier
-                                                    </Button>
-                                                )}
-                                                {(order.statut === 'en_cours' || order.statut === 'livre' || order.statut === 'annule') && (
-                                                    <Button variant="ghost" size="sm" disabled>
-                                                        <FileText className="h-4 w-4 text-muted-foreground" />
-                                                    </Button>
-                                                )}
+
+                                                {/* Sélecteur de statut */}
+                                                <Select
+                                                    value={order.statut}
+                                                    onValueChange={(val) => updateStatus(order.id, val)}
+                                                >
+                                                    <SelectTrigger className="h-8 w-[130px] text-xs gap-1">
+                                                        <Settings2 className="h-3.5 w-3.5 shrink-0" />
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="en_attente">
+                                                            <span className="flex items-center gap-2">
+                                                                <Clock className="h-3.5 w-3.5 text-yellow-500" />
+                                                                En attente
+                                                            </span>
+                                                        </SelectItem>
+                                                        <SelectItem value="approuve">
+                                                            <span className="flex items-center gap-2">
+                                                                <CheckCircle className="h-3.5 w-3.5 text-blue-500" />
+                                                                Approuvé
+                                                            </span>
+                                                        </SelectItem>
+                                                        <SelectItem value="en_cours">
+                                                            <span className="flex items-center gap-2">
+                                                                <Truck className="h-3.5 w-3.5 text-purple-500" />
+                                                                En cours
+                                                            </span>
+                                                        </SelectItem>
+                                                        <SelectItem value="annule">
+                                                            <span className="flex items-center gap-2">
+                                                                <XCircle className="h-3.5 w-3.5 text-red-500" />
+                                                                Annulé
+                                                            </span>
+                                                        </SelectItem>
+                                                    </SelectContent>
+                                                </Select>
                                             </div>
                                         </TableCell>
                                     </TableRow>
@@ -283,7 +299,7 @@ export default function OrdersPage() {
                                     <Label className="text-muted-foreground text-xs">Entreprise</Label>
                                     <div className="flex items-center gap-2 font-medium">
                                         <Building2 className="h-4 w-4 text-primary" />
-                                        {selectedOrder.entreprise?.nom || 'N/A'} ({selectedOrder.entreprise?.sigle})
+                                        {selectedOrder.station?.entreprise?.nom || 'N/A'} ({selectedOrder.station?.entreprise?.sigle})
                                     </div>
                                 </div>
                                 <div className="space-y-1">
@@ -378,6 +394,162 @@ export default function OrdersPage() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* ═══════════════════════════════════════════ */}
+            {/* SECTION RÉSUMÉ PAR STATUT                  */}
+            {/* ═══════════════════════════════════════════ */}
+            {!loading && orders.length > 0 && (
+                <div className="mt-8 space-y-4">
+                    <h2 className="text-lg font-semibold flex items-center gap-2">
+                        <PackageCheck className="h-5 w-5 text-primary" />
+                        Suivi des commandes par statut
+                    </h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                        {/* En Attente */}
+                        {(() => {
+                            const items = orders.filter(o => o.statut === 'en_attente');
+                            return (
+                                <Card className="border-yellow-200">
+                                    <CardHeader className="pb-2">
+                                        <CardTitle className="text-sm font-semibold flex items-center gap-2 text-yellow-700">
+                                            <Clock className="h-4 w-4" />
+                                            En attente
+                                            <Badge className="ml-auto bg-yellow-100 text-yellow-800 border-0">{items.length}</Badge>
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-2">
+                                        {items.length === 0 ? (
+                                            <p className="text-xs text-muted-foreground">Aucune commande</p>
+                                        ) : items.map(order => (
+                                            <div key={order.id} className="flex items-center justify-between p-2 rounded-md bg-yellow-50 border border-yellow-100">
+                                                <div className="flex flex-col">
+                                                    <span className="text-sm font-semibold text-yellow-900">
+                                                        {getEntreprise(order)?.nom || getEntreprise(order)?.sigle || 'N/A'}
+                                                    </span>
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {order.carburant} &bull; {order.quantite_demandee.toLocaleString()} L
+                                                    </span>
+                                                </div>
+                                                <span className="text-xs text-muted-foreground">
+                                                    {format(new Date(order.created_at), 'dd/MM/yy')}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </CardContent>
+                                </Card>
+                            );
+                        })()}
+
+                        {/* Approuvé */}
+                        {(() => {
+                            const items = orders.filter(o => o.statut === 'approuve');
+                            return (
+                                <Card className="border-blue-200">
+                                    <CardHeader className="pb-2">
+                                        <CardTitle className="text-sm font-semibold flex items-center gap-2 text-blue-700">
+                                            <CheckCircle className="h-4 w-4" />
+                                            Approuvé
+                                            <Badge className="ml-auto bg-blue-100 text-blue-800 border-0">{items.length}</Badge>
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-2">
+                                        {items.length === 0 ? (
+                                            <p className="text-xs text-muted-foreground">Aucune commande</p>
+                                        ) : items.map(order => (
+                                            <div key={order.id} className="flex items-center justify-between p-2 rounded-md bg-blue-50 border border-blue-100">
+                                                <div className="flex flex-col">
+                                                    <span className="text-sm font-semibold text-blue-900">
+                                                        {getEntreprise(order)?.nom || getEntreprise(order)?.sigle || 'N/A'}
+                                                    </span>
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {order.carburant} &bull; {order.quantite_demandee.toLocaleString()} L
+                                                    </span>
+                                                </div>
+                                                <span className="text-xs text-muted-foreground">
+                                                    {format(new Date(order.created_at), 'dd/MM/yy')}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </CardContent>
+                                </Card>
+                            );
+                        })()}
+
+                        {/* En Cours */}
+                        {(() => {
+                            const items = orders.filter(o => o.statut === 'en_cours');
+                            return (
+                                <Card className="border-purple-200">
+                                    <CardHeader className="pb-2">
+                                        <CardTitle className="text-sm font-semibold flex items-center gap-2 text-purple-700">
+                                            <Truck className="h-4 w-4" />
+                                            En cours
+                                            <Badge className="ml-auto bg-purple-100 text-purple-800 border-0">{items.length}</Badge>
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-2">
+                                        {items.length === 0 ? (
+                                            <p className="text-xs text-muted-foreground">Aucune commande</p>
+                                        ) : items.map(order => (
+                                            <div key={order.id} className="flex items-center justify-between p-2 rounded-md bg-purple-50 border border-purple-100">
+                                                <div className="flex flex-col">
+                                                    <span className="text-sm font-semibold text-purple-900">
+                                                        {getEntreprise(order)?.nom || getEntreprise(order)?.sigle || 'N/A'}
+                                                    </span>
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {order.carburant} &bull; {order.quantite_demandee.toLocaleString()} L
+                                                    </span>
+                                                </div>
+                                                <span className="text-xs text-muted-foreground">
+                                                    {format(new Date(order.created_at), 'dd/MM/yy')}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </CardContent>
+                                </Card>
+                            );
+                        })()}
+
+                        {/* Annulé */}
+                        {(() => {
+                            const items = orders.filter(o => o.statut === 'annule');
+                            return (
+                                <Card className="border-red-200">
+                                    <CardHeader className="pb-2">
+                                        <CardTitle className="text-sm font-semibold flex items-center gap-2 text-red-700">
+                                            <XCircle className="h-4 w-4" />
+                                            Annulé
+                                            <Badge className="ml-auto bg-red-100 text-red-800 border-0">{items.length}</Badge>
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-2">
+                                        {items.length === 0 ? (
+                                            <p className="text-xs text-muted-foreground">Aucune commande</p>
+                                        ) : items.map(order => (
+                                            <div key={order.id} className="flex items-center justify-between p-2 rounded-md bg-red-50 border border-red-100">
+                                                <div className="flex flex-col">
+                                                    <span className="text-sm font-semibold text-red-900">
+                                                        {getEntreprise(order)?.nom || getEntreprise(order)?.sigle || 'N/A'}
+                                                    </span>
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {order.carburant} &bull; {order.quantite_demandee.toLocaleString()} L
+                                                    </span>
+                                                </div>
+                                                <span className="text-xs text-muted-foreground">
+                                                    {format(new Date(order.created_at), 'dd/MM/yy')}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </CardContent>
+                                </Card>
+                            );
+                        })()}
+
+                    </div>
+                </div>
+            )}
+
         </DashboardLayout >
     );
 }

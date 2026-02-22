@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback, useMemo } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { logLogin } from '@/lib/auditLog';
 
 // Types de rôles disponibles dans l'application - Alignés avec Supabase enum app_role
 export type AppRole =
@@ -158,12 +159,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // IMPORTANT: Set up auth listener first, then check for existing session
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
           // Use setTimeout to avoid Supabase deadlock
           setTimeout(() => fetchUserData(session.user.id), 0);
+          // Log login only on a new sign-in event, not on session restoration
+          if (event === 'SIGNED_IN') {
+            setTimeout(() => logLogin(), 500);
+          }
         } else {
           setProfile(null);
           setRole(null);
@@ -188,6 +193,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      // Log failed login attempt (best effort, no authenticated user needed)
+      try {
+        await (supabase as any).from('audit_logs').insert([{
+          user_email: email,
+          action_type: 'LOGIN',
+          status: 'failed',
+          error_message: error.message,
+          details: { login_timestamp: new Date().toISOString() },
+        }]);
+      } catch { /* ignore */ }
+    }
     return { error };
   }, []);
 
