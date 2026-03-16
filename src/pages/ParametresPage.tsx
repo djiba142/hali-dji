@@ -124,14 +124,10 @@ export default function ParametresPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Mode sombre</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Activer le thème sombre
-                    </p>
-                  </div>
-                  <Switch />
+                <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
+                  <p className="text-sm text-blue-800">
+                    🌙 Le mode sombre est disponible dans <strong>Mon Compte</strong> → section Apparence.
+                  </p>
                 </div>
                 <Separator />
                 <div className="flex items-center justify-between">

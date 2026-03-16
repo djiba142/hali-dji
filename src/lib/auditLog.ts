@@ -54,12 +54,15 @@ export async function logAuditAction(log: Partial<AuditLog>): Promise<{ success:
       action_type: log.action_type,
       resource_type: log.resource_type,
       resource_name: log.resource_name,
-      details: log.details || {},
       status: log.status,
       error_message: log.error_message,
       entreprise_id: entreprise_id,
       ip_address: await getClientIP(),
       user_agent: navigator.userAgent,
+      details: {
+        ...(log.details || {}),
+        device_id: getDeviceId()
+      }
     };
 
     // Insert into audit_logs table
@@ -217,7 +220,10 @@ export async function logFailedAction(
  */
 async function getClientIP(): Promise<string> {
   try {
-    const response = await fetch('https://api.ipify.org?format=json');
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), 2000);
+    const response = await fetch('https://api.ipify.org?format=json', { signal: controller.signal });
+    clearTimeout(id);
     const data = await response.json();
     return data.ip || 'unknown';
   } catch {
@@ -274,4 +280,17 @@ export async function fetchAuditLogs(filters?: {
     console.warn('Audit logs fetch failed:', err);
     return { data: [], error: null }; // Return empty array
   }
+}
+
+/**
+ * Helper to get or create a persistent device ID
+ */
+function getDeviceId(): string {
+  if (typeof window === 'undefined') return 'server';
+  let deviceId = localStorage.getItem('sihg_device_id');
+  if (!deviceId) {
+    deviceId = 'DEV-' + Math.random().toString(36).substring(2, 11).toUpperCase() + '-' + Date.now().toString(36).toUpperCase();
+    localStorage.setItem('sihg_device_id', deviceId);
+  }
+  return deviceId;
 }

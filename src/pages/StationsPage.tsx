@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search, Plus, AlertTriangle, RefreshCw, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Plus, AlertTriangle, RefreshCw, Loader2, ChevronLeft, ChevronRight, Shield, Download } from 'lucide-react';
+import { generateExcelReport } from '@/lib/excelExport';
 // ... other imports stay same, but ensure they are at the top
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { StationCard } from '@/components/stations/StationCard';
@@ -69,7 +70,7 @@ const getLogoForEntreprise = (sigle: string, nom: string): string | null => {
 
 
 export default function StationsPage() {
-  const { role: currentUserRole, profile: currentUserProfile } = useAuth();
+  const { role: currentUserRole, profile: currentUserProfile, canManageStations } = useAuth();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
@@ -89,12 +90,16 @@ export default function StationsPage() {
     adresse: '',
     ville: '',
     region: '',
-    type: 'urbaine' as 'urbaine' | 'routiere' | 'depot',
-    entreprise_id: '',
+    type: 'urbaine' as 'urbaine' | 'routiere' | 'depot' | 'industrielle',
+    entreprise_id: currentUserRole === 'responsable_entreprise' ? (currentUserProfile?.entreprise_id || '') : '',
     capacite_essence: 50000,
     capacite_gasoil: 50000,
     capacite_gpl: 0,
     capacite_lubrifiants: 0,
+    nombre_cuves: 2,
+    nombre_pompes: 4,
+    latitude: 9.5092,
+    longitude: -13.7122,
     gestionnaire_nom: '',
     gestionnaire_telephone: '',
     gestionnaire_email: '',
@@ -201,6 +206,9 @@ export default function StationsPage() {
         return matchesSearch && matchesRegion && matchesEntreprise &&
           ((essencePercent >= 10 && essencePercent < 25) || (gasoilPercent >= 10 && gasoilPercent < 25));
       }
+      if (activeTab === 'pending') {
+        return matchesSearch && matchesRegion && matchesEntreprise && s.statut === 'attente_validation';
+      }
 
       return matchesSearch && matchesRegion && matchesEntreprise;
     });
@@ -215,7 +223,7 @@ export default function StationsPage() {
 
   const totalPages = Math.ceil(filteredStations.length / ITEMS_PER_PAGE);
 
-  const { criticalCount, warningCount } = useMemo(() => {
+  const { criticalCount, warningCount, pendingCount } = useMemo(() => {
     const critical = stations.filter((s: any) => {
       const essencePercent = s.capacite.essence > 0 ? Math.round((s.stockActuel.essence / s.capacite.essence) * 100) : 0;
       const gasoilPercent = s.capacite.gasoil > 0 ? Math.round((s.stockActuel.gasoil / s.capacite.gasoil) * 100) : 0;
@@ -228,12 +236,46 @@ export default function StationsPage() {
       return (essencePercent >= 10 && essencePercent < 25) || (gasoilPercent >= 10 && gasoilPercent < 25);
     }).length;
 
-    return { criticalCount: critical, warningCount: warning };
+    const pending = stations.filter((s: any) => s.statut === 'attente_validation').length;
+
+    return { criticalCount: critical, warningCount: warning, pendingCount: pending };
   }, [stations]);
 
-  const canCreateStation =
-    currentUserRole === 'super_admin' ||
-    (currentUserRole === 'responsable_entreprise' && !!currentUserProfile?.entreprise_id);
+  // useAuth provides canManageStations
+
+  const handleExportExcel = async () => {
+    if (filteredStations.length === 0) {
+      toast({ title: 'Attention', description: 'Aucune donnée à exporter' });
+      return;
+    }
+
+    try {
+      const headers = ['Nom', 'Code', 'Région', 'Ville', 'Entreprise', 'Type', 'Stock Essence (L)', 'Stock Gasoil (L)', 'Statut'];
+      const data = filteredStations.map((s: any) => [
+        s.nom,
+        s.code,
+        s.region,
+        s.ville,
+        s.entrepriseSigle || s.entrepriseNom,
+        s.type.toUpperCase(),
+        s.stockActuel.essence,
+        s.stockActuel.gasoil,
+        s.statut.toUpperCase()
+      ]);
+
+      await generateExcelReport({
+        title: 'REPERTOIRE NATIONAL DES STATIONS-SERVICE - SIHG',
+        filename: `Liste_Stations_SIHG_${new Date().toISOString().slice(0, 10)}`,
+        headers,
+        data,
+        signerRole: currentUserRole || 'admin_etat'
+      });
+
+      toast({ title: 'Succès', description: 'Le registre des stations a été exporté.' });
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: 'Erreur Export', description: err.message });
+    }
+  };
 
   const handleSaveStation = async () => {
     const entrepriseId =
@@ -271,13 +313,17 @@ export default function StationsPage() {
         entreprise_id: entrepriseId!,
         capacite_essence: Number(stationForm.capacite_essence) || 0,
         capacite_gasoil: Number(stationForm.capacite_gasoil) || 0,
-        capacite_gpl: 0,
-        capacite_lubrifiants: 0,
+        capacite_gpl: Number(stationForm.capacite_gpl) || 0,
+        capacite_lubrifiants: Number(stationForm.capacite_lubrifiants) || 0,
+        nombre_cuves: Number(stationForm.nombre_cuves) || 2,
+        nombre_pompes: Number(stationForm.nombre_pompes) || 4,
+        latitude: stationForm.latitude,
+        longitude: stationForm.longitude,
         stock_essence: 0,
         stock_gasoil: 0,
         stock_gpl: 0,
         stock_lubrifiants: 0,
-        statut: 'ouverte',
+        statut: (['super_admin', 'admin_etat', 'directeur_general', 'directeur_adjoint'].includes(currentUserRole || '')) ? 'ouverte' : 'attente_dsa',
         gestionnaire_nom: stationForm.gestionnaire_nom?.trim() || null,
         gestionnaire_telephone: stationForm.gestionnaire_telephone?.trim() || null,
         gestionnaire_email: stationForm.gestionnaire_email?.trim() || null,
@@ -299,12 +345,16 @@ export default function StationsPage() {
         adresse: '',
         ville: '',
         region: '',
-        type: 'urbaine',
-        entreprise_id: '',
+        type: 'urbaine' as 'urbaine' | 'routiere' | 'depot' | 'industrielle',
+        entreprise_id: (currentUserRole === 'responsable_entreprise') ? (currentUserProfile?.entreprise_id || '') : '',
         capacite_essence: 50000,
         capacite_gasoil: 50000,
         capacite_gpl: 0,
         capacite_lubrifiants: 0,
+        nombre_cuves: 2,
+        nombre_pompes: 4,
+        latitude: 9.5092,
+        longitude: -13.7122,
         gestionnaire_nom: '',
         gestionnaire_telephone: '',
         gestionnaire_email: '',
@@ -346,16 +396,31 @@ export default function StationsPage() {
               <AlertTriangle className="h-4 w-4 mr-1" />
               Alertes ({warningCount})
             </TabsTrigger>
+            {(['admin_etat', 'super_admin', 'directeur_aval', 'directeur_adjoint_aval', 'chef_division_distribution', 'directeur_general', 'directeur_adjoint', 'directeur_juridique', 'juriste'].includes(currentUserRole || '')) && (
+              <TabsTrigger value="pending" className="text-blue-600 data-[state=active]:text-blue-600 font-bold">
+                 <Shield className="h-4 w-4 mr-1" />
+                 À Valider ({pendingCount})
+              </TabsTrigger>
+            )}
           </TabsList>
         </Tabs>
 
         <div className="flex gap-2 ml-4">
-          {canCreateStation && (
+          {canManageStations && (
             <Button size="sm" onClick={openStationDialog} className="gap-2">
               <Plus className="h-4 w-4" />
               Nouvelle station
             </Button>
           )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportExcel}
+            className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+          >
+            <Download className="h-4 w-4" />
+            <span className="hidden sm:inline">Excel</span>
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -392,7 +457,7 @@ export default function StationsPage() {
           </SelectContent>
         </Select>
 
-        {currentUserRole === 'super_admin' && (
+        {(currentUserRole === 'super_admin' || currentUserRole === 'admin_etat' || currentUserRole === 'directeur_general' || currentUserRole === 'directeur_adjoint' || currentUserRole === 'analyste') && (
           <Select value={selectedEntreprise} onValueChange={setSelectedEntreprise}>
             <SelectTrigger className="w-full sm:w-[200px]">
               <SelectValue placeholder="Entreprise" />
@@ -550,77 +615,122 @@ export default function StationsPage() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Type de station</Label>
-              <Select
-                value={stationForm.type}
-                onValueChange={(v: 'urbaine' | 'routiere' | 'depot') =>
-                  setStationForm({ ...stationForm, type: v })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner le type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="urbaine">Urbaine</SelectItem>
-                  <SelectItem value="routiere">Routière</SelectItem>
-                  <SelectItem value="depot">Dépôt / Entrepôt</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {currentUserRole === 'super_admin' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Entreprise *</Label>
+                <Label>Type de station</Label>
                 <Select
-                  value={stationForm.entreprise_id}
-                  onValueChange={(v) => setStationForm({ ...stationForm, entreprise_id: v })}
+                  value={stationForm.type}
+                  onValueChange={(v: any) =>
+                    setStationForm({ ...stationForm, type: v })
+                  }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Choisir l'entreprise" />
+                    <SelectValue placeholder="Sélectionner le type" />
                   </SelectTrigger>
                   <SelectContent>
-                    {entreprises.map(e => (
-                      <SelectItem key={e.id} value={e.id}>
-                        {e.sigle || e.nom}
-                      </SelectItem>
-                    ))}
+                    <SelectItem value="urbaine">Urbaine</SelectItem>
+                    <SelectItem value="routiere">Routière</SelectItem>
+                    <SelectItem value="depot">Dépôt / Entrepôt</SelectItem>
+                    <SelectItem value="industrielle">Industrielle</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-            )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {(currentUserRole === 'super_admin' || currentUserRole === 'admin_etat') && (
+                <div className="space-y-2">
+                  <Label>Entreprise *</Label>
+                  <Select
+                    value={stationForm.entreprise_id}
+                    onValueChange={(v) => setStationForm({ ...stationForm, entreprise_id: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choisir l'entreprise" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {entreprises.map(e => (
+                        <SelectItem key={e.id} value={e.id}>
+                          {e.sigle || e.nom}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Capacité essence (litres)</Label>
+                <Label>Latitude (GPS)</Label>
                 <Input
                   type="number"
-                  min="0"
-                  value={stationForm.capacite_essence || ''}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setStationForm({
-                      ...stationForm,
-                      capacite_essence: val === '' ? 0 : Number(val),
-                    });
-                  }}
-                  placeholder="Ex: 50000"
+                  step="0.000001"
+                  value={stationForm.latitude}
+                  onChange={(e) => setStationForm({ ...stationForm, latitude: parseFloat(e.target.value) })}
+                  placeholder="9.50921"
                 />
               </div>
               <div className="space-y-2">
-                <Label>Capacité gasoil (litres)</Label>
+                <Label>Longitude (GPS)</Label>
                 <Input
                   type="number"
-                  min="0"
+                  step="0.000001"
+                  value={stationForm.longitude}
+                  onChange={(e) => setStationForm({ ...stationForm, longitude: parseFloat(e.target.value) })}
+                  placeholder="-13.7122"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="space-y-2">
+                <Label className="text-[10px] uppercase font-bold">Essence (L)</Label>
+                <Input
+                  type="number"
+                  value={stationForm.capacite_essence || ''}
+                  onChange={(e) => setStationForm({...stationForm, capacite_essence: Number(e.target.value)})}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[10px] uppercase font-bold">Gasoil (L)</Label>
+                <Input
+                  type="number"
                   value={stationForm.capacite_gasoil || ''}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setStationForm({
-                      ...stationForm,
-                      capacite_gasoil: val === '' ? 0 : Number(val),
-                    });
-                  }}
-                  placeholder="Ex: 50000"
+                  onChange={(e) => setStationForm({...stationForm, capacite_gasoil: Number(e.target.value)})}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[10px] uppercase font-bold">GPL (L)</Label>
+                <Input
+                  type="number"
+                  value={stationForm.capacite_gpl || ''}
+                  onChange={(e) => setStationForm({...stationForm, capacite_gpl: Number(e.target.value)})}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[10px] uppercase font-bold">Lubrif. (L)</Label>
+                <Input
+                  type="number"
+                  value={stationForm.capacite_lubrifiants || ''}
+                  onChange={(e) => setStationForm({...stationForm, capacite_lubrifiants: Number(e.target.value)})}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Nombre de Pompes</Label>
+                <Input
+                  type="number"
+                  value={stationForm.nombre_pompes}
+                  onChange={(e) => setStationForm({...stationForm, nombre_pompes: Number(e.target.value)})}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Nombre de Cuves</Label>
+                <Input
+                  type="number"
+                  value={stationForm.nombre_cuves}
+                  onChange={(e) => setStationForm({...stationForm, nombre_cuves: Number(e.target.value)})}
                 />
               </div>
             </div>

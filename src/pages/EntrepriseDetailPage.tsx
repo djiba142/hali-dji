@@ -21,11 +21,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import type { Entreprise, Station, Alert } from '@/types';
-// Local logos mapping
-import logoTotal from '@/assets/logos/total-energies.png';
-import logoShell from '@/assets/logos/shell.jpg';
-import logoTMI from '@/assets/logos/tmi.jpg';
-import logoKP from '@/assets/logos/kamsar-petroleum.png';
+import { Progress } from '@/components/ui/progress';
+import { useAuth } from '@/contexts/AuthContext';
 
 // Import logos
 import logoTotal from '@/assets/logos/total-energies.png';
@@ -47,26 +44,34 @@ const getStockLevel = (current: number, capacity: number) => {
   return 'healthy';
 };
 
-const statusStyles = {
+const statusStyles: Record<string, string> = {
   actif: 'bg-emerald-100 text-emerald-700 border-emerald-200',
   suspendu: 'bg-amber-100 text-amber-700 border-amber-200',
-  ferme: 'bg-red-100 text-red-700 border-red-200'
+  ferme: 'bg-red-100 text-red-700 border-red-200',
+  attente_dsa: 'bg-blue-100 text-blue-700 border-blue-200',
+  attente_dla: 'bg-indigo-100 text-indigo-700 border-indigo-200',
+  attente_djc: 'bg-purple-100 text-purple-700 border-purple-200',
+  attente_dsi: 'bg-cyan-100 text-cyan-700 border-cyan-200'
 };
 
-const statusLabels = {
+const statusLabels: Record<string, string> = {
   actif: 'Actif',
   suspendu: 'Suspendu',
-  ferme: 'Fermé'
+  ferme: 'Fermé',
+  attente_dsa: 'Attente DSA',
+  attente_dla: 'Attente DLA',
+  attente_djc: 'Attente DJC',
+  attente_dsi: 'Attente DSI'
 };
 
-const stationStatusStyles = {
+const stationStatusStyles: Record<string, string> = {
   ouverte: 'bg-emerald-100 text-emerald-700',
   fermee: 'bg-red-100 text-red-700',
   en_travaux: 'bg-amber-100 text-amber-700',
   attente_validation: 'bg-blue-100 text-blue-700'
 };
 
-const stationStatusLabels = {
+const stationStatusLabels: Record<string, string> = {
   ouverte: 'Ouverte',
   fermee: 'Fermée',
   en_travaux: 'En travaux',
@@ -75,10 +80,12 @@ const stationStatusLabels = {
 
 export default function EntrepriseDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const { canManageEntreprises, role: currentUserRole } = useAuth();
   const [entreprise, setEntreprise] = useState<Entreprise | null>(null);
   const [stations, setStations] = useState<Station[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!id) {
@@ -126,7 +133,9 @@ export default function EntrepriseDetailPage() {
             telephone: entData.contact_telephone || '',
             email: entData.contact_email || '',
           },
-        });
+          quota_essence: (entData as any).quota_essence || 0,
+          quota_gasoil: (entData as any).quota_gasoil || 0,
+        } as any);
 
         const { data: stData, error: stErr } = await supabase
           .from('stations')
@@ -242,10 +251,21 @@ export default function EntrepriseDetailPage() {
       subtitle={`${entreprise.type === 'compagnie' ? 'Compagnie' : 'Distributeur'} - ${entreprise.region}`}
     >
       {/* Back Button */}
-      <Link to="/entreprises" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6 transition-colors no-underline">
-        <ArrowLeft className="h-4 w-4" />
-        Retour aux entreprises
-      </Link>
+      <div className="flex items-center justify-between mb-6">
+        <Link to="/entreprises" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors no-underline">
+          <ArrowLeft className="h-4 w-4" />
+          Retour aux entreprises
+        </Link>
+        {canManageEntreprises && (
+          <div className="flex gap-2">
+             <Button variant="outline" size="sm" className="rounded-xl border-dashed" onClick={() => setIsEditDialogOpen(true)}>Modifier Infos</Button>
+             {(['admin_etat', 'directeur_aval', 'directeur_adjoint_aval', 'chef_division_distribution'].includes(currentUserRole || '')) && (
+               <Button variant="outline" size="sm" className="rounded-xl border-dashed">Modifier Quotas</Button>
+             )}
+             <Button variant="outline" size="sm" className="rounded-xl">Historique Quotas</Button>
+          </div>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column - Info & Contact */}
@@ -344,6 +364,29 @@ export default function EntrepriseDetailPage() {
                   <p className="text-xs text-muted-foreground">En attente</p>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+          {/* Quotas Status */}
+          <Card className="border-none shadow-sm bg-slate-900 text-white rounded-[2rem]">
+            <CardHeader>
+              <CardTitle className="text-sm font-black uppercase tracking-wider text-slate-400">Suivi des Quotas Mensuels</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div>
+                <div className="flex justify-between text-[10px] font-black uppercase mb-1">
+                  <span className="text-emerald-400">Essence</span>
+                  <span>{(entreprise as any).quota_essence?.toLocaleString()} L</span>
+                </div>
+                <Progress value={35} className="h-1.5 bg-white/10" />
+              </div>
+              <div>
+                <div className="flex justify-between text-[10px] font-black uppercase mb-1">
+                  <span className="text-blue-400">Gasoil</span>
+                  <span>{(entreprise as any).quota_gasoil?.toLocaleString()} L</span>
+                </div>
+                <Progress value={20} className="h-1.5 bg-white/10" />
+              </div>
+              <p className="text-[9px] text-slate-500 font-bold italic">Données synchronisées avec SONAP</p>
             </CardContent>
           </Card>
         </div>

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Mail, ChevronRight, MapPin } from 'lucide-react';
 import logo from '@/assets/logo.png';
+import sonapLogo from '@/assets/sonap.jpeg';
 
 export const LandingFooter = () => {
     return (
@@ -8,12 +9,18 @@ export const LandingFooter = () => {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-12 mb-20">
                     <div className="lg:col-span-2 space-y-6">
-                        <div className="flex items-center">
-                            <Link to="/">
+                        <div className="flex items-center gap-4">
+                            <Link to="/" className="flex items-center gap-4">
                                 <img
                                     src={logo}
                                     alt="SIHG Logo"
                                     className="h-16 w-auto brightness-0 invert"
+                                />
+                                <div className="h-10 w-[1px] bg-white/20"></div>
+                                <img
+                                    src={sonapLogo}
+                                    alt="SONAP Logo"
+                                    className="h-12 w-auto brightness-0 invert opacity-80"
                                 />
                             </Link>
                         </div>
@@ -29,7 +36,7 @@ export const LandingFooter = () => {
                             <li><Link to="/documentation" className="hover:text-[#f97316] transition-colors flex items-center gap-2 group"><ChevronRight className="h-4 w-4 text-[#f97316] group-hover:translate-x-1 transition-transform" /> Documentation</Link></li>
                             <li><Link to="/faq" className="hover:text-[#f97316] transition-colors flex items-center gap-2 group"><ChevronRight className="h-4 w-4 text-[#f97316] group-hover:translate-x-1 transition-transform" /> FAQ</Link></li>
                             <li><Link to="/guide" className="hover:text-[#f97316] transition-colors flex items-center gap-2 group"><ChevronRight className="h-4 w-4 text-[#f97316] group-hover:translate-x-1 transition-transform" /> Guide</Link></li>
-                            <li><Link to="/support" className="hover:text-[#f97316] transition-colors flex items-center gap-2 group"><ChevronRight className="h-4 w-4 text-[#f97316] group-hover:translate-x-1 transition-transform" /> Soutien</Link></li>
+                            <li><Link to="/soutien" className="hover:text-[#f97316] transition-colors flex items-center gap-2 group"><ChevronRight className="h-4 w-4 text-[#f97316] group-hover:translate-x-1 transition-transform" /> Soutien</Link></li>
                         </ul>
                     </div>
 

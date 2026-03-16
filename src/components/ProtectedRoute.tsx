@@ -22,6 +22,11 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
   }
 
   if (!user) {
+    // Save current path to redirect back after login
+    const currentPath = window.location.pathname + window.location.search;
+    if (currentPath !== '/auth' && currentPath !== '/') {
+      sessionStorage.setItem('redirectAfterLogin', currentPath);
+    }
     return <Navigate to="/auth" replace />;
   }
 

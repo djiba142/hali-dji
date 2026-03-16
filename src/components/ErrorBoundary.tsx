@@ -18,8 +18,13 @@ class ErrorBoundary extends Component<Props, State> {
     };
 
     public static getDerivedStateFromError(error: Error): State {
-        // Ignorer l'erreur non critique removeChild (souvent causée par des extensions de navigateur)
-        if (error.message.includes('removeChild') || error.message.includes('Node.removeChild')) {
+        // Ignorer les erreurs de manipulation du DOM (souvent causées par des extensions ou des glitchs de réconciliation React)
+        if (
+            error.message.includes('removeChild') || 
+            error.message.includes('Node.removeChild') ||
+            error.message.includes('insertBefore') ||
+            error.message.includes('Node.insertBefore')
+        ) {
             return { hasError: false, error: null };
         }
         return { hasError: true, error };

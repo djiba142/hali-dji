@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { z } from 'zod';
-import { Fuel, Mail, Lock, Eye, EyeOff, ArrowRight, ShieldAlert, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Fuel, Mail, Lock, Eye, EyeOff, ArrowRight, ShieldAlert, ArrowLeft, CheckCircle2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useSearchParams } from 'react-router-dom';
 import logo from '@/assets/logo.png';
+import sonapLogo from '@/assets/sonap.jpeg';
+import authBg from '@/assets/auth-bg.png';
 
 const loginSchema = z.object({
   email: z.string().email('Email invalide'),
@@ -31,11 +34,21 @@ export default function AuthPage() {
   const [view, setView] = useState<'login' | 'forgot' | 'reset'>('login');
   const [isSuccess, setIsSuccess] = useState(false);
 
+  const [searchParams] = useSearchParams();
+  const reason = searchParams.get('reason');
+
   useEffect(() => {
     // Si l'utilisateur est connecté ET que la vérification du profil est terminée
     if (user && !authLoading && view !== 'reset') {
       if (hasProfile && hasRole) {
-        navigate('/panel');
+        // Check for saved redirect path
+        const savedRedirect = sessionStorage.getItem('redirectAfterLogin');
+        if (savedRedirect) {
+          sessionStorage.removeItem('redirectAfterLogin');
+          navigate(savedRedirect);
+        } else {
+          navigate('/panel');
+        }
       }
     }
   }, [user, hasProfile, hasRole, authLoading, navigate, view]);
@@ -94,7 +107,30 @@ export default function AuthPage() {
     }
   };
 
-  const isUnauthorized = user && (!hasProfile || !hasRole);
+  // Only show "unauthorized" AFTER auth is fully loaded (prevents flash during login redirect)
+  const isUnauthorized = user && !authLoading && (!hasProfile || !hasRole);
+
+  // If user is logged in and we are still loading OR about to redirect, show a spinner
+  // This prevents any UI flashes (unauthorized card or login form)
+  if (user && (authLoading || (hasProfile && hasRole && view !== 'reset'))) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-6">
+          <div className="flex items-center gap-4 animate-in zoom-in-95 duration-500">
+            <img src={logo} alt="SIHG" className="h-16 w-16 drop-shadow-lg" />
+            <div className="h-10 w-[1px] bg-border" />
+            <img src={sonapLogo} alt="SONAP" className="h-12 w-12 drop-shadow-lg" />
+          </div>
+          <div className="flex flex-col items-center gap-3">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-sm font-bold text-slate-500 uppercase tracking-widest animate-pulse">
+              Sécurisation de la session...
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex">
@@ -108,18 +144,24 @@ export default function AuthPage() {
         </div>
         <div className="w-full max-w-md space-y-8">
           <div className="text-center">
-            <img src={logo} alt="SIHG" className="h-16 w-16 mx-auto mb-4" />
+            <div className="flex justify-center items-center gap-3 mb-4 scale-110">
+              <img src={logo} alt="SIHG" className="h-16 w-16" />
+              <div className="h-10 w-[1px] bg-slate-200"></div>
+              <img src={sonapLogo} alt="SONAP" className="h-12 w-12" />
+            </div>
             <h1 className="text-2xl font-bold text-foreground">
               {view === 'login' && 'Connexion'}
               {view === 'forgot' && 'Mot de passe oublié'}
               {view === 'reset' && 'Réinitialisation'}
             </h1>
-            <p className="text-muted-foreground mt-2">
-              {isUnauthorized
-                ? "Compte non configuré"
-                : (view === 'login' ? 'Accédez à votre espace SIHG' : view === 'forgot' ? "Entrez votre email pour recevoir un lien de récupération" : 'Choisissez votre nouveau mot de passe')
-              }
-            </p>
+            {reason === 'expired' && (
+              <div className="mt-4 p-3 rounded-xl bg-orange-50 border border-orange-200 flex items-center gap-3 animate-in slide-in-from-top-2 duration-300">
+                <ShieldAlert className="h-5 w-5 text-orange-600 shrink-0" />
+                <p className="text-xs text-orange-800 font-medium text-left">
+                  Votre session a expiré pour inactivité. Veuillez vous identifier pour continuer vos travaux.
+                </p>
+              </div>
+            )}
           </div>
 
           {isUnauthorized && (
@@ -360,29 +402,53 @@ export default function AuthPage() {
         </div>
       </div>
 
-      {/* Right side - Branding */}
-      <div className="hidden lg:flex flex-1 bg-gradient-to-br from-primary to-primary/80 items-center justify-center p-12">
-        <div className="text-center text-white max-w-md">
-          <Fuel className="h-24 w-24 mx-auto mb-8 opacity-90" />
-          <h2 className="text-3xl font-bold mb-4">
-            Système Intelligent des Hydrocarbures de Guinée
+      {/* Right side - Branding with Petroleum Image */}
+      <div className="hidden lg:flex flex-1 relative items-center justify-center p-12 overflow-hidden">
+        {/* Background Image with Overlay */}
+        <div 
+          className="absolute inset-0 z-0"
+          style={{ 
+            backgroundImage: `url(${authBg})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center'
+          }}
+        >
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px]" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
+        </div>
+
+        <div className="relative z-10 text-center text-white max-w-lg px-6">
+          <div className="mb-10 inline-flex items-center justify-center h-20 w-20 rounded-3xl bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl transition-transform hover:scale-105 duration-500">
+            <Fuel className="h-10 w-10 text-primary opacity-90" />
+          </div>
+          
+          <h2 className="text-3xl lg:text-5xl font-black mb-6 tracking-tighter leading-[0.9] uppercase">
+            Souveraineté <br/>
+            <span className="text-primary italic">Énergétique</span>
           </h2>
-          <p className="text-lg opacity-90">
-            Plateforme de surveillance en temps réel pour la souveraineté énergétique nationale
+          
+          <p className="text-base opacity-70 font-medium text-slate-200 leading-relaxed tracking-wide">
+            Plateforme de surveillance stratégique en temps réel. <br className="hidden lg:block"/> 
+            Pilotage intelligent des flux d'hydrocarbures en République de Guinée.
           </p>
-          <div className="mt-8 grid grid-cols-3 gap-6 text-center">
-            <div>
-              <p className="text-3xl font-bold">5</p>
-              <p className="text-sm opacity-80">Distributeurs</p>
+
+          <div className="mt-12 grid grid-cols-3 gap-6">
+            <div className="p-4 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/10 transition-colors">
+              <p className="text-3xl font-black text-primary">5</p>
+              <p className="text-[10px] uppercase font-bold tracking-widest opacity-70">Marques</p>
             </div>
-            <div>
-              <p className="text-3xl font-bold">148</p>
-              <p className="text-sm opacity-80">Stations</p>
+            <div className="p-4 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/10 transition-colors">
+              <p className="text-3xl font-black text-primary">148</p>
+              <p className="text-[10px] uppercase font-bold tracking-widest opacity-70">Stations</p>
             </div>
-            <div>
-              <p className="text-3xl font-bold">24/7</p>
-              <p className="text-sm opacity-80">Monitoring</p>
+            <div className="p-4 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/10 transition-colors">
+              <p className="text-3xl font-black text-primary">24/7</p>
+              <p className="text-[10px] uppercase font-bold tracking-widest opacity-70">Service</p>
             </div>
+          </div>
+
+          <div className="mt-12 pt-8 border-t border-white/10 text-xs text-slate-400 font-medium tracking-wide">
+            MINISTÈRE DE L'ÉNERGIE, DE L'HYDRAULIQUE ET DES HYDROCARBURES
           </div>
         </div>
       </div>

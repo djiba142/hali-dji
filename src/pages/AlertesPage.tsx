@@ -120,7 +120,7 @@ function getPriorityScore(alert: EnrichedAlert): number {
 }
 
 export default function AlertesPage() {
-  const { profile, role } = useAuth();
+  const { profile, role, canModifyData } = useAuth();
   const { toast } = useToast();
 
   const [alerts, setAlerts] = useState<EnrichedAlert[]>([]);
@@ -647,7 +647,7 @@ export default function AlertesPage() {
                               </Tooltip>
                             </TooltipProvider>
 
-                            {!alert.resolu && (
+                            {canModifyData && !alert.resolu && (
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
@@ -814,28 +814,32 @@ export default function AlertesPage() {
                   </div>
                 )}
 
-                {/* Action buttons */}
                 <div className="flex items-center gap-3 pt-2">
-                  {!selectedAlert.resolu ? (
-                    <Button
-                      className="flex-1 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
-                      onClick={() => handleResolve(selectedAlert.id)}
-                    >
-                      <CheckCircle2 className="h-4 w-4" />
-                      Marquer comme résolu
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      className="flex-1 gap-2"
-                      onClick={() => handleUnresolve(selectedAlert.id)}
-                    >
-                      <RefreshCw className="h-4 w-4" />
-                      Rouvrir l'alerte
-                    </Button>
+                  {canModifyData && (
+                    <>
+                      {!selectedAlert.resolu ? (
+                        <Button
+                          className="flex-1 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                          onClick={() => handleResolve(selectedAlert.id)}
+                        >
+                          <CheckCircle2 className="h-4 w-4" />
+                          Marquer comme résolu
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          className="flex-1 gap-2"
+                          onClick={() => handleUnresolve(selectedAlert.id)}
+                        >
+                          <RefreshCw className="h-4 w-4" />
+                          Rouvrir l'alerte
+                        </Button>
+                      )}
+                    </>
                   )}
                   <Button
                     variant="outline"
+                    className={canModifyData ? "" : "w-full"}
                     onClick={() => setSelectedAlert(null)}
                   >
                     Fermer

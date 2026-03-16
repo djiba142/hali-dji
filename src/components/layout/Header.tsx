@@ -14,6 +14,8 @@ import { NotificationCenter } from '@/components/notifications/NotificationCente
 import { useAuth, ROLE_LABELS } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useTheme } from '@/components/ThemeProvider';
+import { Moon, Sun } from 'lucide-react';
 
 interface HeaderProps {
   title: string;
@@ -22,6 +24,7 @@ interface HeaderProps {
 
 export function Header({ title, subtitle }: HeaderProps) {
   const { profile, role, user, signOut } = useAuth();
+  const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
 
   const handleSignOut = async () => {
@@ -39,15 +42,22 @@ export function Header({ title, subtitle }: HeaderProps) {
   };
 
   return (
-    <header className="sticky top-0 z-30 h-16 bg-background/95 backdrop-blur border-b border-border flex items-center justify-between px-6">
-      <div>
-        <h1 className="text-xl font-bold text-foreground font-display">{title}</h1>
+    <div className="sticky top-0 z-30 w-full">
+      {/* Guinea National Flag Strip */}
+      <div className="flex w-full h-1">
+        <div className="w-1/3 h-full bg-[#CE1126]" /> 
+        <div className="w-1/3 h-full bg-[#FCD116]" /> 
+        <div className="w-1/3 h-full bg-[#00944D]" /> 
+      </div>
+      <header className="h-14 bg-background/80 backdrop-blur-md border-b border-border/50 flex items-center justify-between px-6">
+      <div className="flex flex-col">
+        <h1 className="text-sm font-black text-foreground uppercase tracking-wider">{title}</h1>
         {subtitle && (
-          <p className="text-sm text-muted-foreground">{subtitle}</p>
+          <p className="text-[10px] text-muted-foreground font-medium">{subtitle}</p>
         )}
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
         {/* Search */}
         <div className="relative hidden md:block">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -94,6 +104,14 @@ export function Header({ title, subtitle }: HeaderProps) {
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem 
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} 
+              className="cursor-pointer"
+            >
+              {theme === 'dark' ? <Sun className="h-4 w-4 mr-2" /> : <Moon className="h-4 w-4 mr-2" />}
+              Mode {theme === 'dark' ? 'Clair' : 'Sombre'}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem 
               onClick={handleSignOut} 
               className="cursor-pointer text-destructive focus:text-destructive"
             >
@@ -104,5 +122,6 @@ export function Header({ title, subtitle }: HeaderProps) {
         </DropdownMenu>
       </div>
     </header>
+    </div>
   );
 }

@@ -1,13 +1,14 @@
-import { useState } from 'react';
-import { 
-  Bell, 
-  Check, 
-  AlertTriangle, 
+import { useEffect, useState, useCallback } from 'react';
+import {
+  Bell,
+  Check,
+  AlertTriangle,
   AlertCircle,
   Info,
   Fuel,
   Truck,
-  X
+  X,
+  BellRing
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,8 +18,10 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Notification {
   id: string;
@@ -30,59 +33,12 @@ interface Notification {
   icon: 'alert' | 'fuel' | 'truck' | 'info';
 }
 
-const mockNotifications: Notification[] = [
-  {
-    id: '1',
-    type: 'critical',
-    title: 'Rupture imminente',
-    message: 'Shell Cosa - Stock essence à 6%',
-    timestamp: new Date(Date.now() - 1000 * 60 * 5), // 5 min ago
-    read: false,
-    icon: 'alert',
-  },
-  {
-    id: '2',
-    type: 'critical',
-    title: 'Rupture imminente',
-    message: 'Shell Cosa - Stock gasoil à 8%',
-    timestamp: new Date(Date.now() - 1000 * 60 * 10), // 10 min ago
-    read: false,
-    icon: 'alert',
-  },
-  {
-    id: '3',
-    type: 'warning',
-    title: 'Stock bas',
-    message: 'TotalEnergies Kaloum - Essence à 10%',
-    timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 min ago
-    read: false,
-    icon: 'fuel',
-  },
-  {
-    id: '4',
-    type: 'info',
-    title: 'Livraison programmée',
-    message: 'Camion en route vers TMI Kagbelen',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60), // 1 hour ago
-    read: true,
-    icon: 'truck',
-  },
-  {
-    id: '5',
-    type: 'success',
-    title: 'Livraison confirmée',
-    message: 'Star Oil Aéroport - 45 000L essence',
-    timestamp: new Date(Date.now() - 1000 * 60 * 120), // 2 hours ago
-    read: true,
-    icon: 'truck',
-  },
-];
-
 const iconMap = {
   alert: AlertCircle,
   fuel: Fuel,
   truck: Truck,
   info: Info,
+  success: Check,
 };
 
 const typeStyles = {
@@ -100,22 +56,132 @@ const iconStyles = {
 };
 
 export function NotificationCenter() {
-  const [notifications, setNotifications] = useState(mockNotifications);
+  const { profile, role, user } = useAuth();
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
-  
+
+  const fetchNotifications = useCallback(async () => {
+    try {
+      // 1. Fetch alerts from Supabase
+      const [resAlerts, resNotifications] = await Promise.all([
+        supabase
+          .from('alertes')
+          .select('*, station:stations(nom)')
+          .order('created_at', { ascending: false })
+          .limit(10),
+        (supabase.from('notifications' as any) as any)
+          .select('*')
+          .eq('user_id', user?.id)
+          .order('created_at', { ascending: false })
+          .limit(10)
+      ]);
+
+      const alertsMapped: Notification[] = (resAlerts.data || []).map(a => ({
+        id: a.id,
+        type: a.niveau === 'critique' ? 'critical' : 'warning',
+        title: a.niveau === 'critique' ? 'Rupture imminente' : 'Stock bas',
+        message: `${a.station?.nom || 'Station'}: ${a.message}`,
+        timestamp: parseISO(a.created_at),
+        read: a.resolu || false,
+        icon: a.type === 'stock_critical' ? 'alert' : 'fuel'
+      }));
+
+      const notificationsMapped: Notification[] = (resNotifications.data || []).map((n: any) => ({
+        id: n.id,
+        type: n.type as any,
+        title: n.title,
+        message: n.message,
+        timestamp: parseISO(n.created_at),
+        read: n.read || false,
+        icon: n.type === 'success' ? 'success' : 'info'
+      }));
+
+      setNotifications([...notificationsMapped, ...alertsMapped].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()));
+
+      // 2. AUTO-CHECK: Identify low stocks and create missing alerts
+      // (Expanded role check to ensure monitoring users trigger alerts)
+      const monitoringRoles = ['super_admin', 'service_it', 'admin_etat', 'inspecteur', 'analyste', 'personnel_admin'];
+      if (role && monitoringRoles.includes(role)) {
+        const { data: stations } = await supabase.from('stations').select('id, nom, stock_essence, capacite_essence, stock_gasoil, capacite_gasoil, entreprise_id');
+
+        for (const station of (stations || [])) {
+          const checkFuel = async (fuelType: 'essence' | 'gasoil') => {
+            const stock = station[`stock_${fuelType}` as keyof typeof station] as number;
+            const capacite = station[`capacite_${fuelType}` as keyof typeof station] as number;
+            if (capacite > 0) {
+              const percent = (stock / capacite) * 100;
+              if (percent < 10) {
+                // Check if an UNRESOLVED alert already exists for this station/fuel today
+                const { count } = await supabase
+                  .from('alertes')
+                  .select('*', { count: 'exact', head: true })
+                  .eq('station_id', station.id)
+                  .eq('resolu', false)
+                  .ilike('message', `%${fuelType}%`);
+
+                if (count === 0) {
+                  // AUTO-CREATE ALERT!
+                  await supabase.from('alertes').insert({
+                    station_id: station.id,
+                    entreprise_id: station.entreprise_id,
+                    type: percent < 5 ? 'stock_critical' : 'stock_warning',
+                    niveau: percent < 5 ? 'critique' : 'alerte',
+                    message: `Le niveau d'${fuelType} est à ${Math.round(percent)}% (${stock}L)`,
+                    resolu: false
+                  });
+                }
+              }
+            }
+          };
+
+          await checkFuel('essence');
+          await checkFuel('gasoil');
+        }
+      }
+    } catch (err) {
+      console.error('NotificationCenter error:', err);
+    }
+  }, [role]);
+
+  useEffect(() => {
+    fetchNotifications();
+
+    // Realtime subscription
+    const channel = supabase
+      .channel('notifications-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'alertes' }, () => {
+        fetchNotifications();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchNotifications]);
+
   const unreadCount = notifications.filter(n => !n.read).length;
-  
-  const markAsRead = (id: string) => {
-    setNotifications(prev => 
-      prev.map(n => n.id === id ? { ...n, read: true } : n)
-    );
+
+  const markAsRead = async (id: string) => {
+    try {
+      await supabase.from('alertes').update({ resolu: true }).eq('id', id);
+      // State updated via realtime
+    } catch (err) {
+      console.error('Mark as read error:', err);
+    }
   };
-  
-  const markAllAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+
+  const markAllAsRead = async () => {
+    try {
+      await supabase.from('alertes').update({ resolu: true }).eq('resolu', false);
+    } catch (err) {
+      console.error('Mark all as read error:', err);
+    }
   };
-  
-  const removeNotification = (id: string) => {
+
+  const removeNotification = async (id: string) => {
+    // For this app, removing means marking as resolu or physically deleting
+    // Let's just filter it out locally if we don't want to delete from DB
     setNotifications(prev => prev.filter(n => n.id !== id));
   };
 
@@ -140,9 +206,9 @@ export function NotificationCenter() {
             </p>
           </div>
           {unreadCount > 0 && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               className="text-xs gap-1"
               onClick={markAllAsRead}
             >
@@ -151,7 +217,7 @@ export function NotificationCenter() {
             </Button>
           )}
         </div>
-        
+
         <ScrollArea className="h-[400px]">
           {notifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
@@ -162,9 +228,9 @@ export function NotificationCenter() {
             <div className="divide-y">
               {notifications.map((notification) => {
                 const Icon = iconMap[notification.icon];
-                
+
                 return (
-                  <div 
+                  <div
                     key={notification.id}
                     className={cn(
                       "p-4 hover:bg-muted/50 transition-colors cursor-pointer relative",
@@ -192,8 +258,8 @@ export function NotificationCenter() {
                               {notification.message}
                             </p>
                           </div>
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
                             size="icon"
                             className="h-6 w-6 opacity-0 group-hover:opacity-100 hover:opacity-100"
                             onClick={(e) => {
@@ -205,9 +271,9 @@ export function NotificationCenter() {
                           </Button>
                         </div>
                         <p className="text-[10px] text-muted-foreground mt-1">
-                          {formatDistanceToNow(notification.timestamp, { 
-                            addSuffix: true, 
-                            locale: fr 
+                          {formatDistanceToNow(notification.timestamp, {
+                            addSuffix: true,
+                            locale: fr
                           })}
                         </p>
                       </div>
@@ -221,7 +287,7 @@ export function NotificationCenter() {
             </div>
           )}
         </ScrollArea>
-        
+
         <div className="p-3 border-t bg-muted/30">
           <Button variant="ghost" size="sm" className="w-full text-xs">
             Voir toutes les notifications

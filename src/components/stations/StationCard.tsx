@@ -1,4 +1,4 @@
-import { MapPin, Phone, User, Fuel, Clock, ChevronRight } from 'lucide-react';
+import { MapPin, User, Clock, ChevronRight, Fuel, Scale } from 'lucide-react';
 import { memo } from 'react';
 import { Station } from '@/types';
 import { StockIndicator, StockBadge } from '@/components/dashboard/StockIndicator';
@@ -19,18 +19,23 @@ const statusStyles = {
   ouverte: 'bg-emerald-100 text-emerald-700',
   fermee: 'bg-red-100 text-red-700',
   en_travaux: 'bg-amber-100 text-amber-700',
-  attente_validation: 'bg-blue-100 text-blue-700'
+  attente_validation: 'bg-blue-100 text-blue-700',
+  validation_juridique: 'bg-indigo-100 text-indigo-700 border-indigo-200',
+  suspendu_legal: 'bg-red-500 text-white shadow-lg'
 };
 
 const statusLabels = {
   ouverte: 'Ouverte',
   fermee: 'Fermée',
   en_travaux: 'En travaux',
-  attente_validation: 'En attente'
+  attente_validation: 'En attente',
+  validation_juridique: 'Certifié DJ/C',
+  suspendu_legal: 'Blocage Légal'
 };
 
 function calculatePercentage(current: number, capacity: number): number {
-  return Math.round((current / capacity) * 100);
+  if (!capacity || capacity === 0) return 0;
+  return Math.min(100, Math.round((current / capacity) * 100));
 }
 
 const StationCardComponent = ({ station }: StationCardProps) => {
@@ -50,17 +55,19 @@ const StationCardComponent = ({ station }: StationCardProps) => {
         !hasCritical && !hasWarning && "hover:border-primary/30"
       )}
     >
-      <div className="flex items-start justify-between mb-4">
-        <div>
+      {/* Header: Nom + Statut + Logo entreprise */}
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
+            <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors truncate">
               {station.nom}
             </h3>
             <span className={cn(
-              "px-2 py-0.5 rounded-full text-[10px] font-medium",
-              statusStyles[station.statut]
+              "px-2 py-0.5 rounded-full text-[10px] font-medium flex-shrink-0",
+              statusStyles[station.statut as keyof typeof statusStyles] || 'bg-gray-100 text-gray-700'
             )}>
-              {statusLabels[station.statut]}
+              {station.statut === 'validation_juridique' && <Scale className="h-2.5 w-2.5 mr-1 inline-block" />}
+              {statusLabels[station.statut as keyof typeof statusLabels] || station.statut}
             </span>
           </div>
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
@@ -74,11 +81,34 @@ const StationCardComponent = ({ station }: StationCardProps) => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0 ml-2">
           <StockBadge percentage={Math.min(essencePercent, gasoilPercent)} />
           <ChevronRight className="h-5 w-5 text-muted-foreground/50 group-hover:text-primary group-hover:translate-x-1 transition-all" />
         </div>
       </div>
+
+      {/* Logo + sigle de l'entreprise */}
+      {(station.entrepriseLogo || station.entrepriseSigle || station.entrepriseNom) && (
+        <div className="flex items-center gap-2 mb-3 px-2 py-1.5 bg-slate-50 rounded-lg border border-slate-100">
+          {station.entrepriseLogo ? (
+            <img
+              src={station.entrepriseLogo}
+              alt={station.entrepriseSigle || station.entrepriseNom}
+              className="h-6 w-auto max-w-[48px] object-contain flex-shrink-0"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+          ) : (
+            <div className="h-6 w-6 rounded bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <Fuel className="h-3 w-3 text-primary" />
+            </div>
+          )}
+          <span className="text-xs font-semibold text-slate-700 truncate">
+            {station.entrepriseSigle || station.entrepriseNom}
+          </span>
+        </div>
+      )}
 
       {/* Stock Levels */}
       <div className="space-y-3 mb-4">
@@ -113,7 +143,6 @@ const StationCardComponent = ({ station }: StationCardProps) => {
 
 // Memoize with custom comparison to prevent unnecessary re-renders
 export const StationCard = memo(StationCardComponent, (prevProps, nextProps) => {
-  // Return true if props are equal (don't re-render)
   return (
     prevProps.station.id === nextProps.station.id &&
     prevProps.station.nom === nextProps.station.nom &&
@@ -121,6 +150,7 @@ export const StationCard = memo(StationCardComponent, (prevProps, nextProps) => 
     prevProps.station.stockActuel.essence === nextProps.station.stockActuel.essence &&
     prevProps.station.stockActuel.gasoil === nextProps.station.stockActuel.gasoil &&
     prevProps.station.capacite.essence === nextProps.station.capacite.essence &&
-    prevProps.station.capacite.gasoil === nextProps.station.capacite.gasoil
+    prevProps.station.capacite.gasoil === nextProps.station.capacite.gasoil &&
+    prevProps.station.entrepriseLogo === nextProps.station.entrepriseLogo
   );
 });

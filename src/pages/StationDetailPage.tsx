@@ -9,10 +9,30 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { StockIndicator, StockBadge } from '@/components/dashboard/StockIndicator';
 import { StockEvolutionChart } from '@/components/charts/StockEvolutionChart';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 // Import logos
 import logoTotal from '@/assets/logos/total-energies.png';
@@ -34,60 +54,12 @@ const localLogoMapping: Record<string, string> = {
   'KAMSAR PETROLEUM': logoKP,
 };
 
-// ─── Types ───
-interface StationDetail {
-  id: string;
-  nom: string;
-  code: string;
-  adresse: string;
-  ville: string;
-  region: string;
-  type: string;
-  statut: string;
-  nombre_pompes: number;
-  stock_essence: number;
-  stock_gasoil: number;
-  stock_gpl: number;
-  stock_lubrifiants: number;
-  capacite_essence: number;
-  capacite_gasoil: number;
-  capacite_gpl: number;
-  capacite_lubrifiants: number;
-  gestionnaire_nom: string | null;
-  gestionnaire_telephone: string | null;
-  gestionnaire_email: string | null;
-  entreprise_id: string;
-  entreprise?: {
-    id: string;
-    nom: string;
-    sigle: string;
-    logo_url: string | null;
-  } | null;
-}
-
-interface AlerteRow {
-  id: string;
-  message: string;
-  niveau: string;
-  type: string;
-  created_at: string;
-  resolu: boolean;
-}
-
-interface LivraisonRow {
-  id: string;
-  created_at: string;
-  type_carburant: string;
-  quantite: number;
-  fournisseur: string | null;
-  numero_camion: string | null;
-}
-
 // ─── Constants ───
 const typeLabels: Record<string, string> = {
   urbaine: 'Urbaine',
   routiere: 'Routière',
   depot: 'Dépôt',
+  industrielle: 'Industrielle'
 };
 
 const statusStyles: Record<string, string> = {
@@ -118,445 +90,292 @@ function formatNumber(num: number): string {
 const getLogoForEntreprise = (sigle: string, nom: string): string | null => {
   if (sigle && localLogoMapping[sigle]) return localLogoMapping[sigle];
   if (nom && localLogoMapping[nom]) return localLogoMapping[nom];
-
-  if (nom) {
-    const nomVariations = [
-      nom.split('(')[0].trim(),
-      nom.split('-')[0].trim(),
-    ];
-    for (const variation of nomVariations) {
-      if (localLogoMapping[variation]) return localLogoMapping[variation];
-    }
-  }
   return null;
 };
 
 export default function StationDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const [station, setStation] = useState<StationDetail | null>(null);
-  const [alerts, setAlerts] = useState<AlerteRow[]>([]);
-  const [livraisons, setLivraisons] = useState<LivraisonRow[]>([]);
+  const { toast } = useToast();
+  const { role: currentUserRole, canManageStations, canModifyData } = useAuth();
+  const isReadOnly = currentUserRole === 'super_admin';
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [station, setStation] = useState<any>(null);
+  const [alerts, setAlerts] = useState<any[]>([]);
+  const [livraisons, setLivraisons] = useState<any[]>([]);
+  const [ventes, setVentes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('overview');
+  const [isSaleDialogOpen, setIsSaleDialogOpen] = useState(false);
+  const [recordingSale, setRecordingSale] = useState(false);
+  const [saleForm, setSaleForm] = useState({
+    carburant: 'essence',
+    quantite: '',
+    prix_unitaire: 12000,
+  });
 
   useEffect(() => {
     if (!id) return;
     fetchAll();
+    fetchVentes();
   }, [id]);
+
+  const fetchVentes = async () => {
+    const { data } = await (supabase as any)
+      .from('ventes')
+      .select('*')
+      .eq('station_id', id)
+      .order('created_at', { ascending: false })
+      .limit(20);
+    setVentes(data || []);
+  };
+
+  const handleRecordSale = async () => {
+    if (!saleForm.quantite || Number(saleForm.quantite) <= 0) return;
+    setRecordingSale(true);
+    try {
+      const q = Number(saleForm.quantite);
+      const p = Number(saleForm.prix_unitaire);
+      const { error } = await (supabase as any).from('ventes').insert([{
+        station_id: id,
+        entreprise_id: station?.entreprise_id,
+        carburant: saleForm.carburant,
+        quantite_litres: q,
+        prix_unitaire: p,
+        prix_total: q * p
+      }]);
+      if (error) throw error;
+      toast({ title: "Vente enregistrée", description: `${q}L de ${saleForm.carburant} enregistrés.` });
+      setIsSaleDialogOpen(false);
+      fetchAll();
+      fetchVentes();
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Erreur", description: err.message });
+    } finally {
+      setRecordingSale(false);
+    }
+  };
 
   const fetchAll = async () => {
     setLoading(true);
     setError(null);
     try {
-      // Fetch station with entreprise join
       const { data: stData, error: stErr } = await supabase
         .from('stations')
         .select(`
           *,
           entreprise:entreprises!entreprise_id(id, nom, sigle, logo_url)
         `)
-        .eq('id', id)
+        .eq('id', id!)
         .maybeSingle();
 
       if (stErr) throw stErr;
       if (!stData) {
-        setError(`Aucune station trouvée avec l'ID "${id}"`);
-        setLoading(false);
+        setError("Station non trouvée");
         return;
       }
-      setStation(stData as StationDetail);
+      setStation(stData);
 
-      // Fetch active alerts for this station
       const { data: alertData } = await supabase
         .from('alertes')
-        .select('id, message, niveau, type, created_at, resolu')
-        .eq('station_id', id)
+        .select('*')
+        .eq('station_id', id!)
         .eq('resolu', false)
         .order('created_at', { ascending: false });
-
       setAlerts(alertData || []);
 
-      // Fetch recent deliveries
       const { data: livData } = await supabase
-        .from('mouvements_stock')
-        .select('id, created_at, type_carburant, quantite, fournisseur, numero_camion')
-        .eq('station_id', id)
-        .eq('type_mouvement', 'livraison')
+        .from('livraisons')
+        .select('*')
+        .eq('station_id', id!)
         .order('created_at', { ascending: false })
         .limit(10);
-
       setLivraisons(livData || []);
     } catch (err: any) {
-      setError(err.message || 'Erreur lors du chargement de la station.');
+      setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // ─── Loading ───
-  if (loading) {
-    return (
-      <DashboardLayout title="Chargement...">
-        <div className="flex flex-col items-center justify-center h-96">
-          <Loader2 className="h-12 w-12 animate-spin mb-4 text-muted-foreground" />
-          <p className="text-muted-foreground">Chargement de la station...</p>
-        </div>
-      </DashboardLayout>
-    );
-  }
-
-  // ─── Not found ───
-  if (error || !station) {
-    return (
-      <DashboardLayout title="Station non trouvée">
-        <div className="flex flex-col items-center justify-center h-96">
-          <AlertTriangle className="h-16 w-16 text-muted-foreground mb-4" />
-          <h2 className="text-xl font-semibold mb-2">Station non trouvée</h2>
-          <p className="text-muted-foreground mb-6 max-w-md text-center">
-            {error || `Aucune station trouvée avec l'ID "${id}" dans la base de données.`}
-          </p>
-          <Button asChild>
-            <Link to="/stations">Retour aux stations</Link>
-          </Button>
-        </div>
-      </DashboardLayout>
-    );
-  }
-
-  // ─── Computed values ───
-  const essencePercent = calculatePercentage(station.stock_essence, station.capacite_essence);
-  const gasoilPercent = calculatePercentage(station.stock_gasoil, station.capacite_gasoil);
-  const gplPercent = calculatePercentage(station.stock_gpl, station.capacite_gpl);
-  const lubrifiantsPercent = calculatePercentage(station.stock_lubrifiants, station.capacite_lubrifiants);
+  if (loading) return <DashboardLayout title="Chargement..."><div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin" /></div></DashboardLayout>;
+  if (error || !station) return <DashboardLayout title="Erreur"><div className="text-center py-20 px-4"><AlertTriangle className="h-12 w-12 mx-auto mb-4 text-destructive" /><p>{error}</p><Button asChild className="mt-4"><Link to="/stations">Retour</Link></Button></div></DashboardLayout>;
 
   const entrepriseLogo = station.entreprise?.logo_url || getLogoForEntreprise(station.entreprise?.sigle || '', station.entreprise?.nom || '');
 
   return (
     <DashboardLayout title={station.nom} subtitle={`${station.code} - ${station.ville}`}>
       <div className="space-y-6">
-        {/* ── Header ── */}
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
-            <Link to="/stations">
-              <ArrowLeft className="h-5 w-5" />
-            </Link>
-          </Button>
-
-          {/* Entreprise Logo */}
-          <div className="h-12 w-12 rounded-xl bg-white flex items-center justify-center flex-shrink-0 border border-border overflow-hidden shadow-sm">
-            {entrepriseLogo ? (
-              <img
-                src={entrepriseLogo}
-                alt={`Logo ${station.entreprise?.sigle}`}
-                className="h-10 w-10 object-contain"
-                onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-              />
-            ) : (
-              <span className="text-sm font-bold text-primary">
-                {station.entreprise?.sigle?.substring(0, 2).toUpperCase() || 'ST'}
-              </span>
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" asChild><Link to="/stations"><ArrowLeft className="h-5 w-5" /></Link></Button>
+            <div className="h-12 w-12 rounded-xl bg-white flex items-center justify-center flex-shrink-0 border border-border overflow-hidden shadow-sm">
+              {entrepriseLogo ? <img src={entrepriseLogo} alt="Logo" className="h-10 w-10 object-contain" /> : <Fuel className="h-6 w-6 text-primary" />}
+            </div>
+            <div>
+              <div className="flex items-center gap-3 mb-1">
+                <h1 className="text-2xl font-bold">{station.nom}</h1>
+                <Badge className={cn("text-xs font-semibold", statusStyles[station.statut])}>{statusLabels[station.statut] || station.statut}</Badge>
+              </div>
+              <p className="text-sm text-muted-foreground flex items-center gap-2"><MapPin className="h-4 w-4" /> {station.adresse}, {station.ville}</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            {canManageStations && (
+              <Button variant="outline" className="gap-2" onClick={() => setIsEditDialogOpen(true)}>
+                Modifier Infos
+              </Button>
+            )}
+            {canModifyData && (
+              <Button className="gap-2" onClick={() => setIsSaleDialogOpen(true)}>
+                <TrendingUp className="h-4 w-4" /> Vente direct
+              </Button>
             )}
           </div>
-
-          <div className="flex-1">
-            <div className="flex items-center gap-3 mb-1">
-              <h1 className="text-2xl font-bold text-foreground">{station.nom}</h1>
-              <Badge className={cn("text-xs", statusStyles[station.statut] || 'bg-gray-100 text-gray-700')}>
-                {statusLabels[station.statut] || station.statut || 'Inconnu'}
-              </Badge>
-            </div>
-            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-              <span className="font-mono bg-secondary px-2 py-0.5 rounded">{station.code}</span>
-              <span className="flex items-center gap-1">
-                <MapPin className="h-4 w-4" />
-                {station.adresse}, {station.ville}
-              </span>
-            </div>
-          </div>
-          <StockBadge percentage={Math.min(essencePercent, gasoilPercent)} size="lg" />
         </div>
 
-        {/* ── Active Alerts Banner ── */}
-        {alerts.length > 0 && (
-          <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <AlertTriangle className="h-5 w-5 text-destructive" />
-              <h3 className="font-semibold text-destructive">
-                {alerts.length} alerte{alerts.length > 1 ? 's' : ''} active{alerts.length > 1 ? 's' : ''}
-              </h3>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="bg-muted/50 p-1 rounded-xl">
+            <TabsTrigger value="overview">Vue d'ensemble</TabsTrigger>
+            <TabsTrigger value="stocks">Stocks & Cuves</TabsTrigger>
+            <TabsTrigger value="ventes">Ventes</TabsTrigger>
+            <TabsTrigger value="livraisons">Livraisons</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview" className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+               {[
+                 { label: 'Essence', val: station.stock_essence, color: 'bg-primary/5', iconColor: 'text-primary' },
+                 { label: 'Gasoil', val: station.stock_gasoil, color: 'bg-amber-500/5', iconColor: 'text-amber-600' },
+                 { label: 'Ventes Jour', val: ventes.filter(v => new Date(v.date_vente).toDateString() === new Date().toDateString()).reduce((acc, v) => acc + v.quantite_litres, 0), color: 'bg-emerald-500/5', iconColor: 'text-emerald-600' },
+                 { label: 'Alertes', val: alerts.length, color: 'bg-red-500/5', iconColor: 'text-red-600' },
+               ].map((c, i) => (
+                 <Card key={i} className={cn(c.color, "border-transparent shadow-none")}>
+                   <CardContent className="p-4 flex items-center gap-4">
+                     <div className={cn("h-10 w-10 rounded-lg flex items-center justify-center bg-white border border-border shadow-sm", c.iconColor)}><Fuel className="h-5 w-5" /></div>
+                     <div><p className="text-xs font-medium text-muted-foreground">{c.label}</p><p className="text-xl font-bold">{formatNumber(c.val)} {i < 3 ? 'L' : ''}</p></div>
+                   </CardContent>
+                 </Card>
+               ))}
             </div>
-            <div className="space-y-2">
-              {alerts.map(alert => (
-                <div key={alert.id} className="flex items-center gap-2 text-sm">
-                  <span className={cn(
-                    "w-2 h-2 rounded-full flex-shrink-0",
-                    alert.niveau === 'critique' ? 'bg-red-600' : 'bg-amber-600'
-                  )} />
-                  <span className="text-foreground">{alert.message}</span>
-                  <span className="text-muted-foreground text-xs ml-auto">
-                    {new Date(alert.created_at).toLocaleString('fr-FR')}
-                  </span>
-                </div>
-              ))}
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+               <div className="lg:col-span-2 space-y-6">
+                  <StockEvolutionChart stationId={id} title="Évolution des stocks" />
+                  <Card>
+                    <CardHeader><CardTitle className="text-lg">Infrastructure & Contact</CardTitle></CardHeader>
+                    <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                       {[
+                         { label: 'Pompes', val: station.nombre_pompes },
+                         { label: 'Cuves', val: station.nombre_cuves || '2' },
+                         { label: 'Type', val: typeLabels[station.type] || station.type },
+                         { label: 'Gérant', val: station.gestionnaire_nom || 'Non assigné' },
+                       ].map((x, i) => (
+                         <div key={i} className="bg-slate-50 p-3 rounded-xl border border-slate-100"><p className="text-[10px] uppercase font-bold text-slate-400">{x.label}</p><p className="font-bold truncate">{x.val}</p></div>
+                       ))}
+                    </CardContent>
+                  </Card>
+               </div>
+               <div className="space-y-6">
+                  <Card>
+                    <CardHeader><CardTitle className="text-lg">Prix réglementés</CardTitle></CardHeader>
+                    <CardContent className="space-y-4">
+                       {['essence', 'gasoil', 'gpl'].map(f => (
+                         <div key={f} className="flex justify-between items-center p-3 bg-slate-50 border border-slate-100 rounded-xl">
+                            <span className="font-semibold capitalize">{f}</span>
+                            <span className="font-black text-primary">{formatNumber(prixOfficiels[f as keyof typeof prixOfficiels])} GNF</span>
+                         </div>
+                       ))}
+                    </CardContent>
+                  </Card>
+                  {alerts.length > 0 && (
+                    <Card className="border-red-200 bg-red-50">
+                       <CardContent className="p-4"><p className="text-red-700 font-bold mb-2 flex items-center gap-2"><AlertTriangle className="h-4 w-4" /> Alertes actives</p>
+                       <ul className="space-y-1">{alerts.map(a => <li key={a.id} className="text-xs text-red-600 truncate">• {a.message}</li>)}</ul>
+                       </CardContent>
+                    </Card>
+                  )}
+               </div>
             </div>
-          </div>
-        )}
+          </TabsContent>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* ── Left: Main info ── */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* General info */}
-            <Card>
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Building2 className="h-5 w-5 text-primary" />
-                  Informations générales
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Type de station</p>
-                    <p className="font-medium">{typeLabels[station.type] || station.type || 'Non défini'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Entreprise</p>
-                    <Link
-                      to={`/entreprises/${station.entreprise_id}`}
-                      className="font-medium text-primary hover:underline"
-                    >
-                      {station.entreprise?.nom || '—'}
-                    </Link>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Nombre de pompes</p>
-                    <p className="font-medium flex items-center gap-1">
-                      <Gauge className="h-4 w-4 text-muted-foreground" />
-                      {station.nombre_pompes} pompes
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Région</p>
-                    <p className="font-medium">{station.region}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Ville</p>
-                    <p className="font-medium">{station.ville}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Adresse</p>
-                    <p className="font-medium text-sm">{station.adresse || '—'}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          <TabsContent value="stocks" className="grid grid-cols-1 md:grid-cols-2 gap-6">
+             {[
+               { label: 'Essence', cur: station.stock_essence, cap: station.capacite_essence },
+               { label: 'Gasoil', cur: station.stock_gasoil, cap: station.capacite_gasoil },
+               { label: 'GPL', cur: station.stock_gpl, cap: station.capacite_gpl },
+               { label: 'Lubrifiants', cur: station.stock_lubrifiants, cap: station.capacite_lubrifiants },
+             ].map(f => (
+               <Card key={f.label}>
+                 <CardHeader className="pb-2"><CardTitle className="text-sm font-bold uppercase">{f.label}</CardTitle></CardHeader>
+                 <CardContent className="space-y-4">
+                   <StockIndicator percentage={calculatePercentage(f.cur, f.cap)} label="" size="lg" />
+                   <div className="flex justify-between text-sm font-medium"><span>Actuel: {formatNumber(f.cur)} L</span><span>Capacité: {formatNumber(f.cap)} L</span></div>
+                 </CardContent>
+               </Card>
+             ))}
+          </TabsContent>
 
-            {/* Stock levels */}
-            <Card>
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Fuel className="h-5 w-5 text-primary" />
-                  Niveaux de stock actuels
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  {[
-                    { label: 'Essence', current: station.stock_essence, capacity: station.capacite_essence, percent: essencePercent },
-                    { label: 'Gasoil', current: station.stock_gasoil, capacity: station.capacite_gasoil, percent: gasoilPercent },
-                    { label: 'GPL', current: station.stock_gpl, capacity: station.capacite_gpl, percent: gplPercent },
-                    { label: 'Lubrifiants', current: station.stock_lubrifiants, capacity: station.capacite_lubrifiants, percent: lubrifiantsPercent },
-                  ].map(fuel => (
-                    <div key={fuel.label} className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="font-medium">{fuel.label}</span>
-                        <span className="text-sm text-muted-foreground">
-                          {formatNumber(fuel.current)} L / {formatNumber(fuel.capacity)} L
-                        </span>
-                      </div>
-                      <StockIndicator percentage={fuel.percent} label="" size="md" />
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Stock evolution chart */}
-            <StockEvolutionChart stationId={id} title="Évolution des stocks de la station" />
-
-            {/* Deliveries */}
-            <Card>
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Truck className="h-5 w-5 text-primary" />
-                  Historique des livraisons
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {livraisons.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Truck className="h-10 w-10 mx-auto mb-3 opacity-30" />
-                    <p>Aucune livraison enregistrée</p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="text-left py-2 px-2 font-medium text-muted-foreground">Date</th>
-                          <th className="text-left py-2 px-2 font-medium text-muted-foreground">Carburant</th>
-                          <th className="text-right py-2 px-2 font-medium text-muted-foreground">Quantité</th>
-                          <th className="text-left py-2 px-2 font-medium text-muted-foreground">Fournisseur</th>
-                          <th className="text-left py-2 px-2 font-medium text-muted-foreground">Camion</th>
+          <TabsContent value="ventes" className="space-y-4">
+             <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle>Historique</CardTitle>
+                  {canModifyData && <Button size="sm" onClick={() => setIsSaleDialogOpen(true)}>Nouvelle vente</Button>}
+                </CardHeader>
+                <CardContent className="p-0 overflow-x-auto">
+                   <table className="w-full text-sm">
+                      <thead><tr className="bg-slate-50 text-left"><th className="p-4">Date</th><th className="p-4">Produit</th><th className="p-4 text-right">Quantité</th><th className="p-4 text-right">Montant</th></tr></thead>
+                      <tbody className="divide-y">{ventes.map(v => (
+                        <tr key={v.id}>
+                          <td className="p-4 text-slate-500">{new Date(v.created_at).toLocaleString('fr-FR')}</td>
+                          <td className="p-4"><Badge variant="outline" className="uppercase">{v.carburant}</Badge></td>
+                          <td className="p-4 text-right font-bold">{formatNumber(v.quantite_litres)} L</td>
+                          <td className="p-4 text-right font-bold text-primary">{formatNumber(v.prix_total || 0)} GNF</td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {livraisons.map(liv => (
-                          <tr key={liv.id} className="border-b border-border/50 hover:bg-muted/50">
-                            <td className="py-3 px-2">
-                              <span className="flex items-center gap-1">
-                                <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                                {new Date(liv.created_at).toLocaleDateString('fr-FR')}
-                              </span>
-                            </td>
-                            <td className="py-3 px-2">
-                              <Badge variant="outline">{liv.type_carburant}</Badge>
-                            </td>
-                            <td className="py-3 px-2 text-right font-mono">
-                              {formatNumber(liv.quantite)} L
-                            </td>
-                            <td className="py-3 px-2">{liv.fournisseur || '—'}</td>
-                            <td className="py-3 px-2 font-mono text-xs">{liv.numero_camion || '—'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* ── Right: Sidebar ── */}
-          <div className="space-y-6">
-            {/* Prix officiels */}
-            <Card>
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <TrendingUp className="h-5 w-5 text-primary" />
-                  Prix officiels
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center py-2 border-b border-border/50">
-                    <span>Essence</span>
-                    <span className="font-mono font-semibold">{formatNumber(prixOfficiels.essence)} GNF/L</span>
-                  </div>
-                  <div className="flex justify-between items-center py-2 border-b border-border/50">
-                    <span>Gasoil</span>
-                    <span className="font-mono font-semibold">{formatNumber(prixOfficiels.gasoil)} GNF/L</span>
-                  </div>
-                  <div className="flex justify-between items-center py-2">
-                    <span>GPL</span>
-                    <span className="font-mono font-semibold">{formatNumber(prixOfficiels.gpl)} GNF/L</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Gestionnaire */}
-            <Card>
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <User className="h-5 w-5 text-primary" />
-                  Gestionnaire de station
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                      <User className="h-6 w-6 text-primary" />
-                    </div>
-                    <div>
-                      <p className="font-semibold">{station.gestionnaire_nom || 'Non assigné'}</p>
-                      <p className="text-sm text-muted-foreground">Gestionnaire</p>
-                    </div>
-                  </div>
-                  <div className="space-y-2 pt-2">
-                    {station.gestionnaire_telephone && (
-                      <a
-                        href={`tel:${station.gestionnaire_telephone}`}
-                        className="flex items-center gap-2 text-sm hover:text-primary transition-colors"
-                      >
-                        <Phone className="h-4 w-4 text-muted-foreground" />
-                        {station.gestionnaire_telephone}
-                      </a>
-                    )}
-                    {station.gestionnaire_email && (
-                      <a
-                        href={`mailto:${station.gestionnaire_email}`}
-                        className="flex items-center gap-2 text-sm hover:text-primary transition-colors"
-                      >
-                        <Mail className="h-4 w-4 text-muted-foreground" />
-                        {station.gestionnaire_email}
-                      </a>
-                    )}
-                    {!station.gestionnaire_telephone && !station.gestionnaire_email && (
-                      <p className="text-sm text-muted-foreground">Aucune coordonnée disponible</p>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Capacités */}
-            <Card>
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Fuel className="h-5 w-5 text-primary" />
-                  Capacités de stockage
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {[
-                    { label: 'Essence', value: station.capacite_essence },
-                    { label: 'Gasoil', value: station.capacite_gasoil },
-                    { label: 'GPL', value: station.capacite_gpl },
-                    { label: 'Lubrifiants', value: station.capacite_lubrifiants },
-                  ].map((item, i, arr) => (
-                    <div
-                      key={item.label}
-                      className={cn(
-                        "flex justify-between items-center py-2",
-                        i < arr.length - 1 && "border-b border-border/50"
-                      )}
-                    >
-                      <span className="text-sm">{item.label}</span>
-                      <span className="font-mono text-sm">{formatNumber(item.value)} L</span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Resolved alerts count */}
-            {alerts.length === 0 && (
-              <Card className="border-emerald-200 bg-emerald-50/50 dark:bg-emerald-950/10">
-                <CardContent className="p-4 flex items-center gap-3">
-                  <CheckCircle2 className="h-8 w-8 text-emerald-500 flex-shrink-0" />
-                  <div>
-                    <p className="font-semibold text-emerald-700 dark:text-emerald-400 text-sm">Aucune alerte active</p>
-                    <p className="text-xs text-emerald-600/70">Stocks sous contrôle</p>
-                  </div>
+                      ))}</tbody>
+                   </table>
                 </CardContent>
-              </Card>
-            )}
-          </div>
-        </div>
+             </Card>
+          </TabsContent>
+
+          <TabsContent value="livraisons">
+             <Card>
+                <CardHeader><CardTitle>Dernières réceptions</CardTitle></CardHeader>
+                <CardContent className="p-0 overflow-x-auto">
+                   <table className="w-full text-sm">
+                      <thead><tr className="bg-slate-50 text-left"><th className="p-4">Date</th><th className="p-4">Produit</th><th className="p-4 text-right">Quantité</th><th className="p-4">Détails</th></tr></thead>
+                      <tbody className="divide-y">{livraisons.map(l => (
+                        <tr key={l.id}>
+                          <td className="p-4">{new Date(l.created_at).toLocaleDateString('fr-FR')}</td>
+                          <td className="p-4 uppercase font-bold">{l.carburant}</td>
+                          <td className="p-4 text-right font-bold">{formatNumber(l.quantite)} L</td>
+                          <td className="p-4 text-slate-400 italic text-xs truncate">{l.bon_livraison || l.camion_immatriculation || '—'}</td>
+                        </tr>
+                      ))}</tbody>
+                   </table>
+                </CardContent>
+             </Card>
+          </TabsContent>
+        </Tabs>
       </div>
+
+      <Dialog open={isSaleDialogOpen} onOpenChange={setIsSaleDialogOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader><DialogTitle>Enregistrer une vente</DialogTitle><DialogDescription>Saisie directe pour mise à jour des stocks.</DialogDescription></DialogHeader>
+          <div className="space-y-4 py-4">
+             <div className="space-y-2">
+                <Label>Produit</Label>
+                <Select value={saleForm.carburant} onValueChange={(v) => setSaleForm({...saleForm, carburant: v, prix_unitaire: v === 'essence' ? 12000 : v === 'gasoil' ? 11000 : 8000})}>
+                   <SelectTrigger><SelectValue /></SelectTrigger>
+                   <SelectContent><SelectItem value="essence">Essence</SelectItem><SelectItem value="gasoil">Gasoil</SelectItem><SelectItem value="gpl">GPL</SelectItem></SelectContent>
+                </Select>
+             </div>
+             <div className="space-y-2"><Label>Quantité (L)</Label><Input type="number" value={saleForm.quantite} onChange={(e) => setSaleForm({...saleForm, quantite: e.target.value})} /></div>
+             <div className="p-4 bg-primary/5 rounded-xl border border-primary/10 flex justify-between items-center font-bold"><span>Total:</span><span className="text-primary">{formatNumber(Number(saleForm.quantite || 0) * saleForm.prix_unitaire)} GNF</span></div>
+          </div>
+          <DialogFooter><Button variant="outline" onClick={() => setIsSaleDialogOpen(false)}>Annuler</Button><Button onClick={handleRecordSale} disabled={recordingSale}>{recordingSale ? "Envoi..." : "Valider"}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }

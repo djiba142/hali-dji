@@ -18,7 +18,47 @@ export type StationType = 'urbaine' | 'routiere' | 'depot' | string;
 
 export type AlertType = 'stock_critical' | 'stock_warning' | 'price_anomaly' | 'station_closed';
 
-export type StationStatus = 'ouverte' | 'fermee' | 'en_travaux' | 'attente_validation' | string;
+export type StationStatus = 
+  | 'ouverte' 
+  | 'fermee' 
+  | 'en_travaux' 
+  | 'suspendu_legal'
+  | 'attente_dsa'      // Direction des Services Aval (Technique)
+  | 'attente_dla'      // Direction Logistique et Administrative
+  | 'attente_djc'      // Direction Juridique / Conformité
+  | 'attente_dsi'      // Direction Service Information (Activation)
+  | string;
+
+export type EntrepriseStatus = 
+  | 'actif' 
+  | 'suspendu' 
+  | 'ferme'
+  | 'attente_dsa'
+  | 'attente_dla'
+  | 'attente_djc'
+  | 'attente_dsi';
+
+export type ImportationStatus = 'prevu' | 'arrive' | 'en_dechargement' | 'termine' | string;
+
+export interface Importation {
+  id: string;
+  navire: string;
+  produit: 'essence' | 'gasoil' | 'jet_a1';
+  quantite: number;
+  entrepriseId: string;
+  entrepriseNom: string;
+  paysOrigine: string;
+  dateArrivee: string;
+  port: string;
+  statut: ImportationStatus;
+  documents?: {
+    facture?: string;
+    certificatQualite?: string;
+    douane?: string;
+    autorisation?: string;
+  };
+}
+
 
 // Types d'observation pour inspecteurs
 export type ObservationType =
@@ -50,7 +90,7 @@ export interface Entreprise {
   type: EntrepriseType;
   numeroAgrement: string;
   region: string;
-  statut: 'actif' | 'suspendu' | 'ferme';
+  statut: EntrepriseStatus;
   nombreStations: number;
   logo?: string;
   contact: {
@@ -86,12 +126,16 @@ export interface Station {
     lubrifiants: number;
   };
   nombrePompes: number;
+  nombreCuves?: number;
+  logo?: string;
   gestionnaire: {
     nom: string;
     telephone: string;
     email: string;
   };
   statut: StationStatus;
+  legal_status?: string;
+  is_legally_approved?: boolean;
   derniereLivraison?: {
     date: string;
     quantite: number;
@@ -99,6 +143,7 @@ export interface Station {
   };
   // Score de risque pour inspecteurs
   scoreRisque?: number;
+  isRiskOfShortage?: boolean;
 }
 
 export interface Alert {

@@ -529,12 +529,21 @@ export type Database = {
       app_role:
       | "super_admin"
       | "admin_etat"
+      | "directeur_general"
+      | "directeur_adjoint"
+      | "directeur_aval"
+      | "directeur_adjoint_aval"
+      | "chef_division_distribution"
+      | "chef_bureau_aval"
+      | "agent_supervision_aval"
+      | "controleur_distribution"
+      | "technicien_support_dsa"
+      | "technicien_flux"
       | "inspecteur"
       | "analyste"
       | "personnel_admin"
       | "service_it"
       | "responsable_entreprise"
-      | "gestionnaire_station"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -665,12 +674,21 @@ export const Constants = {
       app_role: [
         "super_admin",
         "admin_etat",
+        "directeur_general",
+        "directeur_adjoint",
+        "directeur_aval",
+        "directeur_adjoint_aval",
+        "chef_division_distribution",
+        "chef_bureau_aval",
+        "agent_supervision_aval",
+        "controleur_distribution",
+        "technicien_support_dsa",
+        "technicien_flux",
         "inspecteur",
         "analyste",
         "personnel_admin",
         "service_it",
         "responsable_entreprise",
-        "gestionnaire_station",
       ],
     },
   },

@@ -20,7 +20,8 @@ import {
 } from "@/components/ui/select";
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, CheckCircle, XCircle, Clock, Truck, Eye, Building2, Calendar, MapPin, Settings2, PackageCheck } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle, Clock, Truck, Eye, Building2, Calendar, MapPin, Settings2, PackageCheck, Gavel } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -45,7 +46,7 @@ interface Order {
     notes: string | null;
     entreprise_id: string | null;
     entreprise: { nom: string; sigle: string } | null;
-    station: { nom: string; ville: string; entreprise: { nom: string; sigle: string } | null } | null;
+    station: { nom: string; ville: string; statut: string; entreprise: { nom: string; sigle: string } | null } | null;
 }
 
 const statusColors: Record<string, string> = {
@@ -62,6 +63,7 @@ export default function OrdersPage() {
     const [filterStatus, setFilterStatus] = useState<string>('all');
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+    const { role } = useAuth();
     const { toast } = useToast();
 
     useEffect(() => {
@@ -92,7 +94,7 @@ export default function OrdersPage() {
                 .select(`
           *,
           entreprise:entreprises(nom, sigle),
-          station:stations(nom, ville, entreprise:entreprises(nom, sigle))
+          station:stations(nom, ville, statut, entreprise:entreprises(nom, sigle))
         `)
                 .order('created_at', { ascending: false });
 
@@ -207,6 +209,11 @@ export default function OrdersPage() {
                                                     <MapPin className="h-3 w-3" />
                                                     {order.station ? order.station.nom : 'Dépôt central'}
                                                 </span>
+                                                {order.station && order.station.statut === 'attente_validation' && (
+                                                    <span className="text-[9px] font-black text-red-600 uppercase flex items-center gap-1 mt-1 bg-red-50 px-1.5 py-0.5 rounded border border-red-100 w-fit">
+                                                        <Gavel className="h-2.5 w-2.5" /> Bloqué (Conformité DJ/C)
+                                                    </span>
+                                                )}
                                             </div>
                                         </TableCell>
 
@@ -219,7 +226,7 @@ export default function OrdersPage() {
                                         </TableCell>
                                         <TableCell>
                                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[order.statut] || 'bg-gray-100'}`}>
-                                                {order.statut.replace('_', ' ')}
+                                                {order.statut?.replace('_', ' ') || 'Inconnu'}
                                             </span>
                                         </TableCell>
                                         <TableCell className="text-right">
@@ -239,41 +246,43 @@ export default function OrdersPage() {
                                                 </Button>
 
                                                 {/* Sélecteur de statut */}
-                                                <Select
-                                                    value={order.statut}
-                                                    onValueChange={(val) => updateStatus(order.id, val)}
-                                                >
-                                                    <SelectTrigger className="h-8 w-[130px] text-xs gap-1">
-                                                        <Settings2 className="h-3.5 w-3.5 shrink-0" />
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="en_attente">
-                                                            <span className="flex items-center gap-2">
-                                                                <Clock className="h-3.5 w-3.5 text-yellow-500" />
-                                                                En attente
-                                                            </span>
-                                                        </SelectItem>
-                                                        <SelectItem value="approuve">
-                                                            <span className="flex items-center gap-2">
-                                                                <CheckCircle className="h-3.5 w-3.5 text-blue-500" />
-                                                                Approuvé
-                                                            </span>
-                                                        </SelectItem>
-                                                        <SelectItem value="en_cours">
-                                                            <span className="flex items-center gap-2">
-                                                                <Truck className="h-3.5 w-3.5 text-purple-500" />
-                                                                En cours
-                                                            </span>
-                                                        </SelectItem>
-                                                        <SelectItem value="annule">
-                                                            <span className="flex items-center gap-2">
-                                                                <XCircle className="h-3.5 w-3.5 text-red-500" />
-                                                                Annulé
-                                                            </span>
-                                                        </SelectItem>
-                                                    </SelectContent>
-                                                </Select>
+                                                {(['admin_etat', 'super_admin', 'directeur_aval', 'directeur_adjoint_aval', 'chef_division_distribution', 'responsable_entreprise'].includes(role || '')) && (
+                                                    <Select
+                                                        value={order.statut}
+                                                        onValueChange={(val) => updateStatus(order.id, val)}
+                                                    >
+                                                        <SelectTrigger className="h-8 w-[130px] text-xs gap-1">
+                                                            <Settings2 className="h-3.5 w-3.5 shrink-0" />
+                                                            <SelectValue />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="en_attente">
+                                                                <span className="flex items-center gap-2">
+                                                                    <Clock className="h-3.5 w-3.5 text-yellow-500" />
+                                                                    En attente
+                                                                </span>
+                                                            </SelectItem>
+                                                            <SelectItem value="approuve">
+                                                                <span className="flex items-center gap-2">
+                                                                    <CheckCircle className="h-3.5 w-3.5 text-blue-500" />
+                                                                    Approuvé
+                                                                </span>
+                                                            </SelectItem>
+                                                            <SelectItem value="en_cours">
+                                                                <span className="flex items-center gap-2">
+                                                                    <Truck className="h-3.5 w-3.5 text-purple-500" />
+                                                                    En cours
+                                                                </span>
+                                                            </SelectItem>
+                                                            <SelectItem value="annule">
+                                                                <span className="flex items-center gap-2">
+                                                                    <XCircle className="h-3.5 w-3.5 text-red-500" />
+                                                                    Annulé
+                                                                </span>
+                                                            </SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                )}
                                             </div>
                                         </TableCell>
                                     </TableRow>
@@ -347,7 +356,7 @@ export default function OrdersPage() {
                                     <Label className="text-muted-foreground text-xs">Statut Actuel</Label>
                                     <div>
                                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[selectedOrder.statut] || 'bg-gray-100'}`}>
-                                            {selectedOrder.statut.replace('_', ' ')}
+                                            {selectedOrder.statut?.replace('_', ' ') || 'Inconnu'}
                                         </span>
                                     </div>
                                 </div>
@@ -366,17 +375,19 @@ export default function OrdersPage() {
                     )}
                     <DialogFooter className="sm:justify-between">
                         <div className="flex-1">
-                            {selectedOrder?.statut === 'en_attente' && (
+                            {selectedOrder?.statut === 'en_attente' && (['admin_etat', 'super_admin', 'directeur_aval', 'directeur_adjoint_aval', 'chef_division_distribution', 'responsable_entreprise'].includes(role || '')) && (
                                 <div className="flex gap-2">
                                     <Button
                                         variant="default"
                                         className="bg-green-600 hover:bg-green-700"
+                                        disabled={selectedOrder?.station?.statut === 'attente_validation'}
                                         onClick={() => {
                                             if (selectedOrder) updateStatus(selectedOrder.id, 'approuve');
                                             setIsDetailsOpen(false);
                                         }}
                                     >
-                                        <CheckCircle className="mr-2 h-4 w-4" /> Approuver
+                                        <CheckCircle className="mr-2 h-4 w-4" /> 
+                                        {selectedOrder?.station?.statut === 'attente_validation' ? 'En attente de DJ/C' : 'Approuver'}
                                     </Button>
                                     <Button
                                         variant="destructive"

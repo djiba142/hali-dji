@@ -29,8 +29,10 @@ import {
 import { Label } from '@/components/ui/label';
 import type { Entreprise } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function EntreprisesPage() {
+  const { role: currentUserRole, canManageEntreprises } = useAuth();
   const [entreprises, setEntreprises] = useState<Entreprise[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -50,6 +52,8 @@ export default function EntreprisesPage() {
     contactNom: string;
     contactTelephone: string;
     contactEmail: string;
+    quota_essence: number;
+    quota_gasoil: number;
   }>({
     nom: '',
     sigle: '',
@@ -59,6 +63,8 @@ export default function EntreprisesPage() {
     contactNom: '',
     contactTelephone: '',
     contactEmail: '',
+    quota_essence: 0,
+    quota_gasoil: 0,
   });
 
   const localLogoMapping: Record<string, string> = {
@@ -237,6 +243,8 @@ export default function EntreprisesPage() {
         contact_nom: formData.contactNom.trim() || null,
         contact_telephone: formData.contactTelephone.trim() || null,
         contact_email: formData.contactEmail.trim() || null,
+        quota_essence: formData.quota_essence || 0,
+        quota_gasoil: formData.quota_gasoil || 0,
       });
 
       if (error) throw error;
@@ -255,6 +263,8 @@ export default function EntreprisesPage() {
         contactNom: '',
         contactTelephone: '',
         contactEmail: '',
+        quota_essence: 0,
+        quota_gasoil: 0,
       });
       setLogoFile(null);
       setLogoPreview(null);
@@ -311,10 +321,12 @@ export default function EntreprisesPage() {
           </SelectContent>
         </Select>
 
-        <Button className="gap-2" onClick={() => setIsDialogOpen(true)}>
-          <Plus className="h-4 w-4" />
-          Nouvelle entreprise
-        </Button>
+        {canManageEntreprises && (
+          <Button className="gap-2" onClick={() => setIsDialogOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Nouvelle entreprise
+          </Button>
+        )}
       </div>
 
       {/* Stats */}
@@ -493,6 +505,26 @@ export default function EntreprisesPage() {
                   onChange={e => setFormData({ ...formData, contactEmail: e.target.value })}
                   placeholder="contact@entreprise.gn"
                 />
+              </div>
+
+              {/* Quotas Initial */}
+              <div className="grid grid-cols-2 gap-4 border-t pt-4">
+                <div className="space-y-2">
+                  <Label className="text-emerald-700">Quota Essence (L) *</Label>
+                  <Input
+                    type="number"
+                    value={formData.quota_essence}
+                    onChange={e => setFormData({ ...formData, quota_essence: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-blue-700">Quota Gasoil (L) *</Label>
+                  <Input
+                    type="number"
+                    value={formData.quota_gasoil}
+                    onChange={e => setFormData({ ...formData, quota_gasoil: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
               </div>
             </div>
           </div>

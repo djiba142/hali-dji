@@ -104,6 +104,9 @@ export default {
         elevated: "0 4px 6px -1px hsl(220 25% 10% / 0.08), 0 2px 4px -2px hsl(220 25% 10% / 0.05)",
         glow: "0 0 20px hsl(42 95% 50% / 0.3)",
       },
+      transitionDuration: {
+        '2000': '2000ms',
+      },
     },
   },
   // 2. On utilise la variable ici au lieu du require()

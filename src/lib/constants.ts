@@ -17,6 +17,17 @@ export const REGIONS = [
 
 export type Region = typeof REGIONS[number];
 
+export const PREFECTURES_BY_REGION: Record<string, string[]> = {
+    'Conakry': ['Kaloum', 'Dixinn', 'Ratoma', 'Matam', 'Matoto'],
+    'Boké': ['Boké', 'Boffa', 'Fria', 'Koundara', 'Gaoual'],
+    'Kindia': ['Kindia', 'Coyah', 'Dubréka', 'Forécariah', 'Télimélé'],
+    'Mamou': ['Mamou', 'Dalaba', 'Pita'],
+    'Labé': ['Labé', 'Koubia', 'Lélouma', 'Mali', 'Tougué'],
+    'Faranah': ['Faranah', 'Dabola', 'Dinguiraye', 'Kissidougou'],
+    'Kankan': ['Kankan', 'Kérouané', 'Kouroussa', 'Siguiri', 'Mandiana'],
+    'N\'Zérékoré': ['N\'Zérékoré', 'Beyla', 'Guéckédou', 'Lola', 'Macenta', 'Yomou']
+};
+
 export const FUEL_TYPES = [
     { id: 'essence', label: 'Essence Super', unit: 'L' },
     { id: 'gasoil', label: 'Gasoil', unit: 'L' },
