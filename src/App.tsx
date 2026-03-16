@@ -62,6 +62,10 @@ const DashboardPersonnelAdmin = lazy(() => import("@/pages/dashboards/DashboardP
 const DashboardServiceIT = lazy(() => import("@/pages/dashboards/DashboardServiceIT"));
 const DashboardDSA = lazy(() => import("@/pages/dashboards/DashboardDSA"));
 
+// Intelligence & Analyse
+const StatistiquesPage = lazy(() => import("@/pages/analyste/StatistiquesPage"));
+const PrevisionsPage = lazy(() => import("@/pages/analyste/PrevisionsPage"));
+
 const DashboardJuridique = lazy(() => import("@/pages/dashboards/DashboardJuridique"));
 const DashboardFinance = lazy(() => import("@/pages/dashboards/DashboardFinance"));
 const DashboardImportation = lazy(() => import("./pages/dashboards/DashboardImportation"));
@@ -505,6 +509,23 @@ const App = () => (
                   </ProtectedRoute>
                 }>
                   <Route index element={<Suspense fallback={<PageLoader />}><RapportsPage /></Suspense>} />
+                </Route>
+
+                {/* Intelligence & Analyse (Statistiques et Prévisions) */}
+                <Route path="/statistiques" element={
+                  <ProtectedRoute>
+                    <RequireRole allowedRoles={['analyste', 'directeur_general', 'directeur_adjoint', 'super_admin', 'admin_etat']} />
+                  </ProtectedRoute>
+                }>
+                  <Route index element={<Suspense fallback={<PageLoader />}><StatistiquesPage /></Suspense>} />
+                </Route>
+
+                <Route path="/previsions" element={
+                  <ProtectedRoute>
+                    <RequireRole allowedRoles={['analyste', 'directeur_general', 'directeur_adjoint', 'super_admin', 'admin_etat']} />
+                  </ProtectedRoute>
+                }>
+                  <Route index element={<Suspense fallback={<PageLoader />}><PrevisionsPage /></Suspense>} />
                 </Route>
 
                 {/* ═══════════════════════════════════════════════ */}
