@@ -3,7 +3,7 @@ import {
   FolderOpen, Plus, Search, Filter, FileText, CheckCircle2, 
   XCircle, Clock, MoreHorizontal, Download, Eye, 
   Building2, ArrowRight, ShieldCheck, AlertCircle,
-  FileCheck, Shield, Activity, UserCheck, Archive
+  FileCheck, Shield, Activity, UserCheck, Archive, PenTool
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -279,33 +279,34 @@ export default function AdminDossiersPage() {
                                 
                                 <DropdownMenuSeparator className="my-1" />
                                 
-                                {d.statut === 'recu' && ['agent_administratif', 'chef_service_administratif', 'super_admin'].includes(role || '') && (
-                                  <DropdownMenuItem className="gap-2 cursor-pointer rounded-lg font-bold text-blue-600" onClick={() => { setSelectedDossier(d); setIsDossierDetailOpen(true); }}>
-                                    <FileText className="h-4 w-4" /> Procéder à la Numérisation (Scan)
-                                  </DropdownMenuItem>
-                                )}
-
+                                {/* Transitions selon la hiérarchie SONAP */}
                                 {d.statut === 'numerise' && ['agent_administratif', 'chef_service_administratif', 'super_admin'].includes(role || '') && (
-                                  <DropdownMenuItem className="gap-2 cursor-pointer rounded-lg font-bold text-amber-600" onClick={() => handleUpdateStatus(d.id, 'analyse_technique')}>
-                                    <Activity className="h-4 w-4" /> Transmettre à la DSA (Technique)
+                                  <DropdownMenuItem className="gap-2 cursor-pointer rounded-lg font-bold text-blue-600" onClick={() => handleUpdateStatus(d.id, 'analyse_technique')}>
+                                    <ArrowRight className="h-4 w-4" /> Transmettre pour Analyse Technique (DSA)
                                   </DropdownMenuItem>
                                 )}
 
                                 {d.statut === 'analyse_technique' && ['directeur_aval', 'directeur_adjoint_aval', 'chef_bureau_aval', 'super_admin'].includes(role || '') && (
-                                  <DropdownMenuItem className="gap-2 cursor-pointer rounded-lg font-bold text-indigo-600" onClick={() => handleUpdateStatus(d.id, 'analyse_administrative')}>
-                                    <FileCheck className="h-4 w-4" /> Valider & Transmettre à la DA
+                                  <DropdownMenuItem className="gap-2 cursor-pointer rounded-lg font-bold text-amber-600" onClick={() => handleUpdateStatus(d.id, 'analyse_administrative')}>
+                                    <FileCheck className="h-4 w-4" /> Valider & Transférer à la Direction Admin (DA)
                                   </DropdownMenuItem>
                                 )}
 
                                 {d.statut === 'analyse_administrative' && ['directeur_administratif', 'chef_service_administratif', 'super_admin'].includes(role || '') && (
-                                  <DropdownMenuItem className="gap-2 cursor-pointer rounded-lg font-bold text-purple-600" onClick={() => handleUpdateStatus(d.id, 'analyse_juridique')}>
-                                    <Shield className="h-4 w-4" /> Valider & Transmettre à la DJ/C
+                                  <DropdownMenuItem className="gap-2 cursor-pointer rounded-lg font-bold text-indigo-600" onClick={() => handleUpdateStatus(d.id, 'analyse_juridique')}>
+                                    <Shield className="h-4 w-4" /> Valider & Transférer au Juridique (DJ)
                                   </DropdownMenuItem>
                                 )}
 
                                 {d.statut === 'analyse_juridique' && ['directeur_juridique', 'juriste', 'super_admin'].includes(role || '') && (
-                                  <DropdownMenuItem className="gap-2 cursor-pointer rounded-lg font-bold text-emerald-600" onClick={() => handleUpdateStatus(d.id, 'approuve')}>
-                                    <CheckCircle2 className="h-4 w-4" /> Proposer pour Approbation Finale (DG)
+                                  <DropdownMenuItem className="gap-2 cursor-pointer rounded-lg font-bold text-purple-600" onClick={() => handleUpdateStatus(d.id, 'approuve')}>
+                                    <PenTool className="h-4 w-4" /> Soumettre pour Branche DG (Signature)
+                                  </DropdownMenuItem>
+                                )}
+
+                                {d.statut === 'approuve' && ['directeur_general', 'super_admin'].includes(role || '') && (
+                                  <DropdownMenuItem className="gap-2 cursor-pointer rounded-lg font-bold text-emerald-600" onClick={() => handleUpdateStatus(d.id, 'archive')}>
+                                    <Archive className="h-4 w-4" /> Archiver le Dossier (Traitement Terminé)
                                   </DropdownMenuItem>
                                 )}
 
@@ -486,60 +487,78 @@ export default function AdminDossiersPage() {
               </div>
 
                 <div className="flex flex-col gap-3">
-                  <Button variant="outline" className="rounded-xl px-8 font-bold h-12" onClick={() => setIsDossierDetailOpen(false)}>Fermer</Button>
+                  <Button variant="outline" className="rounded-xl px-8 font-bold h-12" onClick={() => setIsDossierDetailOpen(false)}>Fermer l'Aperçu</Button>
                   
-                  {/* Action for Administrative Agent during Scan Phase */}
-                  {selectedDossier.statut === 'recu' && (selectedDossier.rccm_url || selectedDossier.nif_url || selectedDossier.statuts_url) && (
-                    <Button 
-                      className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-8 h-12 font-black uppercase text-[10px] tracking-widest shadow-xl shadow-blue-600/20"
-                      onClick={() => handleUpdateStatus(selectedDossier.id, 'numerise')}
-                    >
-                      <FileCheck className="mr-2 h-4 w-4" /> Terminer la Numérisation
-                    </Button>
-                  )}
+                  {/* Décision Hiérarchique SONAP */}
+                  <div className="p-1 bg-slate-100 rounded-2xl flex flex-col gap-1">
+                    {/* Étape AVAL (DSA) */}
+                    {selectedDossier.statut === 'numerise' && role?.includes('aval') && (
+                      <Button 
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl h-14 font-black uppercase text-[10px] tracking-widest shadow-xl shadow-indigo-600/20"
+                        onClick={() => handleUpdateStatus(selectedDossier.id, 'analyse_technique')}
+                      >
+                        <Activity className="mr-2 h-4 w-4" /> Valider Analyse Technique (DSA)
+                      </Button>
+                    )}
 
-                  {/* Decision Panel for Directions */}
-                  {((selectedDossier.statut === 'numerise' && role?.includes('aval')) ||
-                    (selectedDossier.statut === 'analyse_technique' && role?.includes('administratif')) ||
-                    (selectedDossier.statut === 'analyse_administrative' && role?.includes('juridique')) ||
-                    (selectedDossier.statut === 'analyse_juridique' && ['directeur_general', 'super_admin'].includes(role || ''))) && (
-                    <div className="flex gap-2 w-full">
+                    {/* Étape ADMIN (DA) */}
+                    {selectedDossier.statut === 'analyse_technique' && role?.includes('administratif') && (
                       <Button 
-                        variant="destructive" 
-                        className="flex-1 rounded-xl h-12 font-black uppercase text-[10px] tracking-widest"
-                        onClick={() => handleUpdateStatus(selectedDossier.id, 'rejete')}
+                        className="bg-amber-600 hover:bg-amber-700 text-white rounded-xl h-14 font-black uppercase text-[10px] tracking-widest shadow-xl shadow-amber-600/20"
+                        onClick={() => handleUpdateStatus(selectedDossier.id, 'analyse_administrative')}
                       >
-                        Rejeter
+                        <FileCheck className="mr-2 h-4 w-4" /> Valider Analyse Administrative (DA)
                       </Button>
+                    )}
+
+                    {/* Étape JURIDIQUE (DJ) */}
+                    {selectedDossier.statut === 'analyse_administrative' && role?.includes('juridique') && (
                       <Button 
-                        className="flex-[2] bg-slate-900 hover:bg-black text-white rounded-xl h-12 font-black uppercase text-[10px] tracking-widest shadow-xl"
-                        onClick={() => {
-                          const nextStatus: Record<string, DossierStatus> = {
-                            'numerise': 'analyse_technique',
-                            'analyse_technique': 'analyse_administrative',
-                            'analyse_administrative': 'analyse_juridique',
-                            'analyse_juridique': 'approuve'
-                          };
-                          handleUpdateStatus(selectedDossier.id, nextStatus[selectedDossier.statut] || 'approuve');
-                        }}
+                        className="bg-purple-600 hover:bg-purple-700 text-white rounded-xl h-14 font-black uppercase text-[10px] tracking-widest shadow-xl shadow-purple-600/20"
+                        onClick={() => handleUpdateStatus(selectedDossier.id, 'analyse_juridique')}
                       >
-                        Valider & Transférer
+                        <Shield className="mr-2 h-4 w-4" /> Valider Analyse Juridique (DJ)
                       </Button>
-                    </div>
-                  )}
+                    )}
+
+                    {/* Étape DG (Signature) */}
+                    {selectedDossier.statut === 'analyse_juridique' && (role === 'directeur_general' || role === 'super_admin') && (
+                      <div className="flex gap-2">
+                        <Button variant="destructive" className="flex-1 rounded-xl h-14 font-black uppercase text-[10px] tracking-widest" onClick={() => handleUpdateStatus(selectedDossier.id, 'rejete')}>REJETER</Button>
+                        <Button 
+                          className="flex-[2] bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl h-14 font-black uppercase text-[10px] tracking-widest shadow-xl shadow-emerald-600/30"
+                          onClick={() => {
+                            toast.info("Notification envoyée à l'entreprise : DOSSIER APPROUVÉ");
+                            handleUpdateStatus(selectedDossier.id, 'approuve');
+                          }}
+                        >
+                          APPROUVER & SIGNER (DG)
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Archivage Final */}
+                    {selectedDossier.statut === 'approuve' && (role === 'directeur_general' || role === 'super_admin') && (
+                      <Button 
+                        className="bg-slate-900 hover:bg-black text-white rounded-xl h-14 font-black uppercase text-[10px] tracking-widest shadow-xl"
+                        onClick={() => handleUpdateStatus(selectedDossier.id, 'archive')}
+                      >
+                        <Archive className="mr-2 h-4 w-4" /> Clôturer & Archiver le Dossier
+                      </Button>
+                    )}
+                  </div>
                   
-                  {/* Final Approval Action */}
+                  {/* Actions de téléchargement (si approuvé) */}
                   {selectedDossier.statut === 'approuve' && (
                      <Button 
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-8 h-12 font-black uppercase text-[10px] tracking-widest shadow-xl shadow-emerald-600/20"
+                      variant="outline"
+                      className="border-emerald-200 bg-emerald-50 text-emerald-700 rounded-xl px-8 h-12 font-black uppercase text-[10px] tracking-widest"
                       onClick={() => {
-                        toast.success("Document officiel généré en PDF !");
-                        setTimeout(() => {
-                           window.open('https://bjcnvbrcyezswdrefzgh.supabase.co/storage/v1/object/public/templates/exemplaire_agrement_sihg.pdf', '_blank');
-                        }, 1000);
+                        toast.success("Impression de l'Agrément / Licence en cours...");
+                        window.open('https://bjcnvbrcyezswdrefzgh.supabase.co/storage/v1/object/public/templates/exemplaire_agrement_sihg.pdf', '_blank');
                       }}
                      >
-                       <ShieldCheck className="mr-2 h-4 w-4" /> Télécharger l'Agrément / Licence
+                       <Download className="mr-2 h-4 w-4" /> Télécharger Agrément Signé
                      </Button>
                   )}
                 </div>
