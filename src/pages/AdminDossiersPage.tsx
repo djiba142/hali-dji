@@ -62,7 +62,7 @@ export default function AdminDossiersPage() {
   const [newTypeDemande, setNewTypeDemande] = useState('agrement_entreprise');
   
   // Procedure Wizard States
-  const [wizardStep, setWizardStep] = useState(1); // 1: Recu, 2: Pre-controle, 3: Numerisation
+  const [wizardStep, setWizardStep] = useState(1); // 1: Recu, 2: Pre-controle, 3: Numerisation, 4: Confirmation
   const [checklist, setChecklist] = useState({
     rccm: false,
     nif: false,
@@ -70,6 +70,8 @@ export default function AdminDossiersPage() {
     photos: false,
     quittance: false
   });
+  const [isComplete, setIsComplete] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetchDossiers();
@@ -549,41 +551,44 @@ export default function AdminDossiersPage() {
       {/* New Dossier Creation (Simplified for demo) */}
       <Dialog open={isNewDialogOpen} onOpenChange={setIsNewDialogOpen}>
         <DialogContent className="max-w-2xl p-8 rounded-[2rem] border-none shadow-2xl">
-          <div className="flex items-center gap-2 mb-6">
-            {[1, 2, 3].map((step) => (
+          <div className="flex items-center gap-2 mb-8">
+            {[1, 2, 3, 4].map((step) => (
               <div 
                 key={step} 
                 className={cn(
-                  "h-2 flex-1 rounded-full transition-all duration-500",
+                  "h-1.5 flex-1 rounded-full transition-all duration-700",
                   wizardStep >= step ? "bg-slate-900" : "bg-slate-100"
                 )} 
               />
             ))}
           </div>
 
-          <DialogHeader>
-             <DialogTitle className="text-3xl font-black tracking-tighter">
+          <DialogHeader className="mb-6">
+             <DialogTitle className="text-3xl font-black tracking-tighter flex items-center gap-3">
+               <div className="h-8 w-8 rounded-lg bg-slate-900 text-white flex items-center justify-center text-sm">{wizardStep}</div>
                {wizardStep === 1 && "1. RÉCEPTION PHYSIQUE"}
-               {wizardStep === 2 && "2. PRÉ-CONTRÔLE DOCS"}
-               {wizardStep === 3 && "3. FINALISATION"}
+               {wizardStep === 2 && "2. PRÉ-CONTRÔLE (CHECKLIST)"}
+               {wizardStep === 3 && "3. NUMÉRISATION (SCAN PDF)"}
+               {wizardStep === 4 && "4. ENREGISTREMENT SIHG"}
              </DialogTitle>
-             <DialogDescription className="font-medium">
+             <DialogDescription className="font-bold text-slate-500 uppercase text-[10px] tracking-widest mt-2 px-11">
                {wizardStep === 1 && "Enregistrement des informations de base du dossier papier."}
-               {wizardStep === 2 && "Vérification de la présence des pièces obligatoires."}
-               {wizardStep === 3 && "Attribution du numéro de dossier et confirmation."}
+               {wizardStep === 2 && "Vérification physique des pièces obligatoires."}
+               {wizardStep === 3 && "Conversion des documents papier en fichiers PDF numériques."}
+               {wizardStep === 4 && "Validation finale et entrée officielle dans le workflow."}
              </DialogDescription>
           </DialogHeader>
 
-          <div className="py-6 min-h-[300px]">
+          <div className="py-2 min-h-[350px]">
             {wizardStep === 1 && (
-              <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+              <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
                  <div className="space-y-3">
-                   <Label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Nom de l'Entité (Entreprise / Station)</Label>
+                   <Label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Nom de l'Entité (Propriétaire / Société)</Label>
                    <div className="relative">
-                     <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300" />
+                     <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300" />
                      <Input 
                        placeholder="Ex: SONAP Distribution SARL" 
-                       className="rounded-2xl h-14 pl-10 border-slate-200 focus:border-slate-900 transition-all font-bold text-lg shadow-sm" 
+                       className="rounded-[1.25rem] h-16 pl-12 border-slate-200 focus:border-slate-900 transition-all font-bold text-lg shadow-sm bg-slate-50/30" 
                        value={newEntiteNom}
                        onChange={(e) => setNewEntiteNom(e.target.value)}
                      />
@@ -591,23 +596,23 @@ export default function AdminDossiersPage() {
                  </div>
                  <div className="grid grid-cols-2 gap-6">
                    <div className="space-y-3">
-                     <Label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Type d'Entité</Label>
+                     <Label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Type d'Entité</Label>
                      <Select value={newEntiteType} onValueChange={setNewEntiteType}>
-                        <SelectTrigger className="rounded-2xl h-14 border-slate-200 font-bold shadow-sm"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="rounded-[1.25rem] h-16 border-slate-200 font-bold shadow-sm bg-slate-50/30"><SelectValue /></SelectTrigger>
                         <SelectContent className="rounded-2xl p-2">
-                           <SelectItem value="entreprise" className="rounded-xl">Entreprise</SelectItem>
+                           <SelectItem value="entreprise" className="rounded-xl">Entreprise Pétrolière</SelectItem>
                            <SelectItem value="station" className="rounded-xl">Station-Service</SelectItem>
                         </SelectContent>
                      </Select>
                    </div>
                    <div className="space-y-3">
-                     <Label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Nature de la Demande</Label>
+                     <Label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Nature de la Demande</Label>
                      <Select value={newTypeDemande} onValueChange={setNewTypeDemande}>
-                        <SelectTrigger className="rounded-2xl h-14 border-slate-200 font-bold shadow-sm"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="rounded-[1.25rem] h-16 border-slate-200 font-bold shadow-sm bg-slate-50/30"><SelectValue /></SelectTrigger>
                         <SelectContent className="rounded-2xl p-2">
-                           <SelectItem value="agrement_entreprise" className="rounded-xl">Demande d'Agrément</SelectItem>
-                           <SelectItem value="ouverture_station" className="rounded-xl">Ouverture Station</SelectItem>
-                           <SelectItem value="renouvellement_licence" className="rounded-xl">Licence d'Exploitation</SelectItem>
+                           <SelectItem value="agrement_entreprise" className="rounded-xl">Agrément d'Exploitation</SelectItem>
+                           <SelectItem value="ouverture_station" className="rounded-xl">Ouverture de Station</SelectItem>
+                           <SelectItem value="renouvellement_licence" className="rounded-xl">Renouvellement Licence</SelectItem>
                         </SelectContent>
                      </Select>
                    </div>
@@ -616,34 +621,40 @@ export default function AdminDossiersPage() {
             )}
 
             {wizardStep === 2 && (
-              <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
-                <p className="text-sm font-bold text-slate-500 mb-4 bg-amber-50 p-4 rounded-2xl border border-amber-100 flex gap-2">
-                  <AlertCircle className="h-5 w-5 text-amber-600 shrink-0" />
-                  Veuillez vérifier physiquement le dossier papier et cocher les pièces présentes.
-                </p>
+              <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-500">
+                <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100 flex gap-3 items-center mb-6">
+                  <div className="h-10 w-10 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+                    <AlertCircle className="h-6 w-6 text-amber-600" />
+                  </div>
+                  <p className="text-xs font-bold text-amber-900">
+                    La numérisation n'est autorisée que si le dossier physique est complet. Vérifiez chaque pièce.
+                  </p>
+                </div>
                 <div className="grid grid-cols-1 gap-2">
-                  {Object.entries(checklist).map(([key, value]) => (
+                  {[
+                    { key: 'rccm', label: 'Registre du Commerce (RCCM)' },
+                    { key: 'nif', label: "Numéro d'Identification Fiscale (NIF)" },
+                    { key: 'statuts', label: "Statuts de l'Entreprise" },
+                    { key: 'photos', label: "Photos du Site" },
+                    { key: 'quittance', label: "Quittance de Frais" },
+                  ].map((item) => (
                     <div 
-                      key={key} 
-                      onClick={() => setChecklist(prev => ({ ...prev, [key]: !value }))}
+                      key={item.key} 
+                      onClick={() => setChecklist(prev => ({ ...prev, [item.key]: ! (prev as any)[item.key] }))}
                       className={cn(
                         "flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer group",
-                        value ? "bg-emerald-50 border-emerald-200" : "bg-white border-slate-100 hover:border-slate-300"
+                        (checklist as any)[item.key] ? "bg-emerald-50 border-emerald-200 shadow-sm" : "bg-white border-slate-100 hover:border-slate-300"
                       )}
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-4">
                         <div className={cn(
-                          "h-6 w-6 rounded-lg flex items-center justify-center transition-colors",
-                          value ? "bg-emerald-500 text-white" : "bg-slate-100 text-slate-300 group-hover:bg-slate-200"
+                          "h-6 w-6 rounded-lg flex items-center justify-center transition-all",
+                          (checklist as any)[item.key] ? "bg-emerald-500 text-white scale-110 shadow-lg shadow-emerald-500/20" : "bg-slate-100 text-slate-300 group-hover:bg-slate-200"
                         )}>
-                          {value ? <CheckCircle2 className="h-4 w-4" /> : <div className="h-2 w-2 rounded-full bg-current" />}
+                          {(checklist as any)[item.key] ? <CheckCircle2 className="h-4 w-4" /> : <div className="h-2 w-2 rounded-full bg-current" />}
                         </div>
-                        <span className={cn("font-bold uppercase text-[10px] tracking-widest", value ? "text-emerald-700" : "text-slate-500")}>
-                          {key === 'rccm' && "Registre du Commerce (RCCM)"}
-                          {key === 'nif' && "Numéro d'Identification Fiscale (NIF)"}
-                          {key === 'statuts' && "Statuts de l'Entreprise"}
-                          {key === 'photos' && "Photos du Site (Si Station)"}
-                          {key === 'quittance' && "Quittance de Frais de Dossier"}
+                        <span className={cn("font-black uppercase text-[10px] tracking-widest", (checklist as any)[item.key] ? "text-emerald-700" : "text-slate-400")}>
+                          {item.label}
                         </span>
                       </div>
                     </div>
@@ -653,55 +664,124 @@ export default function AdminDossiersPage() {
             )}
 
             {wizardStep === 3 && (
-              <div className="flex flex-col items-center justify-center text-center space-y-6 animate-in zoom-in-95 duration-500 py-10">
-                <div className="h-24 w-24 rounded-[2.5rem] bg-slate-900 flex items-center justify-center text-white shadow-2xl shadow-slate-900/20 rotate-3 hover:rotate-0 transition-transform duration-500">
-                  <CheckCircle2 className="h-12 w-12" />
+              <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-500">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {[
+                    { id: 'rccm_url', name: 'SCAN RCCM' },
+                    { id: 'nif_url', name: 'SCAN NIF' },
+                    { id: 'statuts_url', name: 'SCAN STATUTS' },
+                    { id: 'autorisation_url', name: 'SCAN QUITTANCE' }
+                  ].map((doc) => (
+                    <div key={doc.id} className="p-4 rounded-2xl border border-slate-200 bg-white shadow-sm flex flex-col gap-4">
+                      <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{doc.name}</Label>
+                      <div className="relative group">
+                        <Input 
+                          type="file" 
+                          className="absolute inset-0 opacity-0 cursor-pointer z-10" 
+                          accept=".pdf"
+                          onChange={(e) => {
+                             const file = e.target.files?.[0];
+                             if (file) {
+                               setUploadedFiles(prev => ({ ...prev, [doc.id]: 'PENDING_UPLOAD' }));
+                               setTimeout(() => {
+                                 setUploadedFiles(prev => ({ ...prev, [doc.id]: `https://storage.sihg.gn/temp/${doc.id}.pdf` }));
+                                 toast.success(`${doc.name} prêt pour enregistrement.`);
+                               }, 1000);
+                             }
+                          }}
+                        />
+                        <div className={cn(
+                          "h-14 rounded-xl border-2 border-dashed flex items-center justify-center gap-2 transition-all",
+                          uploadedFiles[doc.id] ? "bg-blue-50 border-blue-200 text-blue-600" : "border-slate-100 bg-slate-50 group-hover:bg-white group-hover:border-slate-300"
+                        )}>
+                          {uploadedFiles[doc.id] ? (
+                            <><FileCheck className="h-5 w-5" /> <span className="text-xs font-bold uppercase">PDF Chargé</span></>
+                          ) : (
+                            <><Plus className="h-5 w-5 opacity-50" /> <span className="text-xs font-bold uppercase text-slate-400">Scanner le document</span></>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div>
-                  <h4 className="text-2xl font-black text-slate-900 tracking-tighter">PRÊT À L'ENREGISTREMENT</h4>
-                  <p className="text-slate-500 font-medium max-w-xs mx-auto mt-2">
-                    Le dossier physique sera enregistré avec le statut 
-                    <Badge className="mx-1 bg-slate-100 text-slate-900 border-none">
-                      {Object.values(checklist).every(v => v) ? 'REÇU' : 'INCOMPLET'}
-                    </Badge>
+              </div>
+            )}
+
+            {wizardStep === 4 && (
+              <div className="flex flex-col items-center justify-center text-center space-y-8 animate-in zoom-in-95 duration-500 py-12">
+                <div className="h-32 w-32 rounded-[3.5rem] bg-slate-900 border-[8px] border-white flex items-center justify-center text-white shadow-2xl shadow-slate-900/40 rotate-12 hover:rotate-0 transition-transform duration-700">
+                  <ShieldCheck className="h-14 w-14" />
+                </div>
+                <div className="space-y-3">
+                  <h4 className="text-3xl font-black text-slate-900 tracking-tighter">PRÊT POUR LE SIHG</h4>
+                  <p className="text-slate-500 font-bold max-w-sm mx-auto leading-relaxed uppercase text-[10px] tracking-widest italic opacity-60">
+                    "En cliquant sur confirmer, vous transformez ce dossier physique en dossier numérique officiel SONAP."
                   </p>
                 </div>
               </div>
             )}
           </div>
 
-          <DialogFooter className="gap-3">
+          <DialogFooter className="gap-4 mt-8">
              {wizardStep > 1 && (
-               <Button variant="ghost" className="rounded-2xl h-14 px-8 font-bold" onClick={() => setWizardStep(prev => prev - 1)}>Retour</Button>
+               <Button variant="ghost" className="rounded-2xl h-16 px-10 font-black uppercase text-[10px] tracking-widest border border-slate-100" onClick={() => setWizardStep(prev => prev - 1)}>Retour</Button>
              )}
-             {wizardStep < 3 ? (
+             
+             {wizardStep === 2 && !Object.values(checklist).every(v => v) ? (
+                <Button 
+                  className="bg-red-600 hover:bg-red-700 text-white rounded-2xl h-16 px-10 font-black uppercase text-[10px] tracking-widest shadow-xl shadow-red-600/20"
+                  onClick={async () => {
+                    const { error } = await supabase.from('dossiers').insert([{
+                      numero_dossier: `SONAP-${new Date().getFullYear()}-${Math.floor(Math.random()*9000)+1000}`,
+                      entite_nom: newEntiteNom,
+                      entite_type: newEntiteType,
+                      type_demande: newTypeDemande,
+                      statut: 'incomplet',
+                      entite_id: '00000000-0000-0000-0000-000000000000',
+                      observations: "Dossier physique incomplet lors du pré-contrôle."
+                    }]);
+                    if (error) toast.error(error.message);
+                    else {
+                      toast.error("Dossier INCOMPLET enregistré et bloqué.");
+                      setIsNewDialogOpen(false);
+                      setWizardStep(1);
+                      fetchDossiers();
+                    }
+                  }}
+                >
+                  Dossier Incomplet (Enregistrer)
+                </Button>
+             ) : wizardStep < 4 ? (
                <Button 
-                className="bg-slate-900 text-white rounded-2xl h-14 px-10 font-black uppercase text-[10px] tracking-widest shadow-xl shadow-slate-900/20" 
+                className="bg-slate-900 hover:bg-black text-white rounded-2xl h-16 px-12 font-black uppercase text-[10px] tracking-widest shadow-2xl shadow-slate-900/30 transition-all active:scale-95" 
                 onClick={() => {
                   if (wizardStep === 1 && !newEntiteNom) return toast.error("Entrez le nom de l'entité");
                   setWizardStep(prev => prev + 1);
                 }}
                >
-                 Continuer <ArrowRight className="ml-2 h-4 w-4" />
+                 Prochaine Étape <ArrowRight className="ml-3 h-4 w-4" />
                </Button>
              ) : (
                <Button 
-                className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl h-14 px-10 font-black uppercase text-[10px] tracking-widest shadow-xl shadow-emerald-600/20 transition-all active:scale-95" 
+                className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl h-16 px-14 font-black uppercase text-[10px] tracking-widest shadow-2xl shadow-emerald-600/40 transition-all active:scale-95" 
                 onClick={async () => {
-                  const isComplete = Object.values(checklist).every(v => v);
                   const { error } = await supabase.from('dossiers').insert([{
                     numero_dossier: `SONAP-${new Date().getFullYear()}-${Math.floor(Math.random()*9000)+1000}`,
                     entite_nom: newEntiteNom,
                     entite_type: newEntiteType,
                     type_demande: newTypeDemande,
-                    statut: isComplete ? 'recu' : 'incomplet',
+                    statut: 'numerise',
                     entite_id: '00000000-0000-0000-0000-000000000000',
-                    observations: isComplete ? "Dossier physique complet réceptionné." : "Dossier incomplet. Pièces manquantes identifiées au pré-contrôle."
+                    rccm_url: uploadedFiles.rccm_url,
+                    nif_url: uploadedFiles.nif_url,
+                    statuts_url: uploadedFiles.statuts_url,
+                    autorisation_url: uploadedFiles.autorisation_url,
+                    observations: "Dossier physique complet et numérisé avec succès."
                   }]);
 
                   if (error) toast.error(error.message);
                   else {
-                    toast.success(isComplete ? "Dossier RÉÇU enregistré !" : "Dossier INCOMPLET enregistré !");
+                    toast.success("Dossier NUMÉRISÉ enregistré dans SIHG !");
                     setIsNewDialogOpen(false);
                     setWizardStep(1);
                     setNewEntiteNom('');
@@ -709,7 +789,7 @@ export default function AdminDossiersPage() {
                   }
                 }}
               >
-                Confirmer la Réception
+                Confirmer l'Enregistrement
               </Button>
              )}
           </DialogFooter>
