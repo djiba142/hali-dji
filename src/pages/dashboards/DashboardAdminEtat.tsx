@@ -205,7 +205,8 @@ export default function DashboardAdminEtat() {
                 filename: `Etat_National_Stocks_${new Date().toISOString().slice(0, 10)}`,
                 headers,
                 data,
-                signerRole: 'admin_etat'
+                signerRole: 'admin_etat',
+                signerName: profile?.full_name || 'Administrateur Central'
             });
         } catch (error) {
             console.error('Error generating excel:', error);

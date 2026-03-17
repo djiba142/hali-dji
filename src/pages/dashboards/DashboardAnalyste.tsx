@@ -24,6 +24,7 @@ import { REGIONS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { generateCustomReportPDF } from '@/lib/pdfExport';
 import { generateExcelReport } from '@/lib/excelExport';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface PrixOfficiel {
     carburant: string;
@@ -256,7 +257,8 @@ export default function DashboardAnalyste() {
                 filename: `stats_national_${new Date().toISOString().split('T')[0]}.xlsx`,
                 headers,
                 data,
-                signerRole: 'analyste'
+                signerRole: 'analyste',
+                signerName: 'Cellule d\'Analyse Stratégique'
             });
         } catch (error) {
             console.error('Error exporting Excel:', error);

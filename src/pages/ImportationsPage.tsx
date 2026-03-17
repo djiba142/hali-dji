@@ -45,7 +45,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 export default function ImportationsPage() {
-    const { role: currentUserRole, canModifyData } = useAuth();
+    const { role: currentUserRole, canModifyData, profile } = useAuth();
     const [searchTerm, setSearchTerm] = useState("");
     const navigate = useNavigate();
     const { toast } = useToast();
@@ -101,7 +101,8 @@ export default function ImportationsPage() {
               filename: `Importations_SIHG_${new Date().toISOString().slice(0, 10)}`,
               headers,
               data: dataRows,
-              signerRole: currentUserRole || 'admin_etat'
+              signerRole: currentUserRole || 'admin_etat',
+              signerName: profile?.full_name || 'Direction des Importations'
             });
             toast({ title: "Succès", description: "Export Excel certifié réussi." });
           } catch (err: any) {

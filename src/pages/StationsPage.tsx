@@ -268,7 +268,8 @@ export default function StationsPage() {
         filename: `Liste_Stations_SIHG_${new Date().toISOString().slice(0, 10)}`,
         headers,
         data,
-        signerRole: currentUserRole || 'admin_etat'
+        signerRole: currentUserRole || 'admin_etat',
+        signerName: currentUserProfile?.full_name || 'Direction Nationale'
       });
 
       toast({ title: 'Succès', description: 'Le registre des stations a été exporté.' });
@@ -323,7 +324,7 @@ export default function StationsPage() {
         stock_gasoil: 0,
         stock_gpl: 0,
         stock_lubrifiants: 0,
-        statut: (['super_admin', 'admin_etat', 'directeur_general', 'directeur_adjoint'].includes(currentUserRole || '')) ? 'ouverte' : 'attente_dsa',
+        statut: (['super_admin', 'admin_etat', 'secretaire_general'].includes(currentUserRole || '')) ? 'ouverte' : 'attente_dsa',
         gestionnaire_nom: stationForm.gestionnaire_nom?.trim() || null,
         gestionnaire_telephone: stationForm.gestionnaire_telephone?.trim() || null,
         gestionnaire_email: stationForm.gestionnaire_email?.trim() || null,
@@ -346,7 +347,7 @@ export default function StationsPage() {
         ville: '',
         region: '',
         type: 'urbaine' as 'urbaine' | 'routiere' | 'depot' | 'industrielle',
-        entreprise_id: (currentUserRole === 'responsable_entreprise') ? (currentUserProfile?.entreprise_id || '') : '',
+        entreprise_id: '',
         capacite_essence: 50000,
         capacite_gasoil: 50000,
         capacite_gpl: 0,
@@ -376,7 +377,7 @@ export default function StationsPage() {
   const openStationDialog = () => {
     setStationForm(prev => ({
       ...prev,
-      entreprise_id: currentUserRole === 'responsable_entreprise' ? (currentUserProfile?.entreprise_id || '') : prev.entreprise_id,
+      entreprise_id: prev.entreprise_id,
       region: prev.region || REGIONS[0] || '',
     }));
     setIsStationDialogOpen(true);
@@ -396,7 +397,7 @@ export default function StationsPage() {
               <AlertTriangle className="h-4 w-4 mr-1" />
               Alertes ({warningCount})
             </TabsTrigger>
-            {(['admin_etat', 'super_admin', 'directeur_aval', 'directeur_adjoint_aval', 'chef_division_distribution', 'directeur_general', 'directeur_adjoint', 'directeur_juridique', 'juriste'].includes(currentUserRole || '')) && (
+            {(['admin_etat', 'super_admin', 'secretaire_general', 'directeur_aval', 'directeur_adjoint_aval', 'chef_division_distribution', 'directeur_general', 'directeur_adjoint', 'directeur_juridique', 'juriste'].includes(currentUserRole || '')) && (
               <TabsTrigger value="pending" className="text-blue-600 data-[state=active]:text-blue-600 font-bold">
                  <Shield className="h-4 w-4 mr-1" />
                  À Valider ({pendingCount})

@@ -20,6 +20,27 @@ import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 
+interface ImportFournisseur {
+  id: string;
+  nom: string;
+  pays: string;
+  contact_email: string | null;
+  contact_tel: string | null;
+  adresse: string | null;
+  statut: string;
+}
+
+interface NewFournisseur {
+  nom: FormDataEntryValue | null;
+  pays: FormDataEntryValue | null;
+  contact_email: FormDataEntryValue | null;
+  contact_tel: FormDataEntryValue | null;
+  adresse: FormDataEntryValue | null;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const db = supabase as unknown as { from: (table: string) => any };
+
 export default function ImportFournisseursPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
@@ -29,18 +50,18 @@ export default function ImportFournisseursPage() {
   const { data: suppliers, isLoading } = useQuery({
     queryKey: ['import-fournisseurs'],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await db
         .from('import_fournisseurs')
         .select('*')
         .order('nom', { ascending: true });
       if (error) throw error;
-      return data || [];
+      return (data as ImportFournisseur[]) || [];
     }
   });
 
   const createMutation = useMutation({
-    mutationFn: async (newSupplier: any) => {
-      const { error } = await (supabase as any)
+    mutationFn: async (newSupplier: NewFournisseur) => {
+      const { error } = await db
         .from('import_fournisseurs')
         .insert(newSupplier);
       if (error) throw error;
@@ -51,7 +72,7 @@ export default function ImportFournisseursPage() {
     }
   });
 
-  const filteredSuppliers = suppliers?.filter((s: any) => 
+  const filteredSuppliers = suppliers?.filter((s: ImportFournisseur) => 
     s.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
     s.pays.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -141,7 +162,7 @@ export default function ImportFournisseursPage() {
                 <TableRow><TableCell colSpan={5} className="text-center py-10">Chargement...</TableCell></TableRow>
               ) : filteredSuppliers?.length === 0 ? (
                 <TableRow><TableCell colSpan={5} className="text-center py-10 text-slate-400 italic">Aucun fournisseur trouvé.</TableCell></TableRow>
-              ) : filteredSuppliers?.map((s: any) => (
+              ) : filteredSuppliers?.map((s: ImportFournisseur) => (
                 <TableRow key={s.id} className="hover:bg-slate-50/50">
                   <TableCell>
                     <div className="flex items-center gap-3">

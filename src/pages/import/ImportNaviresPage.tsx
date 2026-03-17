@@ -17,6 +17,27 @@ import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 
+interface ImportNavire {
+  id: string;
+  nom: string;
+  imo_number: string;
+  pavillon: string | null;
+  capacite_mt: number;
+  capitaine: string | null;
+  statut: string;
+}
+
+interface NewNavire {
+  nom: FormDataEntryValue | null;
+  imo_number: FormDataEntryValue | null;
+  pavillon: FormDataEntryValue | null;
+  capacite_mt: number;
+  capitaine: FormDataEntryValue | null;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const db = supabase as unknown as { from: (table: string) => any };
+
 export default function ImportNaviresPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
@@ -26,18 +47,18 @@ export default function ImportNaviresPage() {
   const { data: ships, isLoading } = useQuery({
     queryKey: ['import-navires'],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await db
         .from('import_navires')
         .select('*')
         .order('nom', { ascending: true });
       if (error) throw error;
-      return data || [];
+      return (data as ImportNavire[]) || [];
     }
   });
 
   const createMutation = useMutation({
-    mutationFn: async (newShip: any) => {
-      const { error } = await (supabase as any)
+    mutationFn: async (newShip: NewNavire) => {
+      const { error } = await db
         .from('import_navires')
         .insert(newShip);
       if (error) throw error;
@@ -48,7 +69,7 @@ export default function ImportNaviresPage() {
     }
   });
 
-  const filteredShips = ships?.filter((s: any) => 
+  const filteredShips = ships?.filter((s: ImportNavire) => 
     s.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
     s.imo_number.includes(searchTerm)
   );
@@ -127,7 +148,7 @@ export default function ImportNaviresPage() {
             <div className="col-span-full py-20 text-center">Chargement des navires...</div>
           ) : filteredShips?.length === 0 ? (
             <div className="col-span-full py-20 text-center text-slate-400 italic">Aucun navire répertorié.</div>
-          ) : filteredShips?.map((ship: any) => (
+          ) : filteredShips?.map((ship: ImportNavire) => (
             <Card key={ship.id} className="border-none shadow-lg group hover:shadow-2xl transition-all duration-300 relative overflow-hidden">
               <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
                 <Ship className="h-24 w-24 -rotate-12" />

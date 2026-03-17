@@ -27,7 +27,8 @@ import {
     ClipboardCheck,
     ShieldCheck,
     ShieldAlert,
-    Info
+    Info,
+    FolderOpen
 } from 'lucide-react';
 import { generateCustomReportPDF } from '@/lib/pdfExport';
 import { notifyStationStatusUpdate } from '@/lib/notifications';
@@ -236,7 +237,8 @@ export default function DashboardDSA() {
                 filename: `Anomalies_Quotas_SONAP_${format(new Date(), 'dd-MM-yyyy')}`,
                 headers,
                 data,
-                signerRole: 'DSA'
+                signerRole: role || 'directeur_aval',
+                signerName: profile?.full_name || 'Direction des Services Aval'
             });
         } catch (error) {
             console.error('Error exporting Excel:', error);
@@ -284,6 +286,12 @@ export default function DashboardDSA() {
                             </Link>
                         </Button>
                     )}
+                    <Button size="sm" variant="outline" className="gap-2 shadow-sm" asChild>
+                        <Link to="/administratif/dossiers">
+                            <FolderOpen className="h-4 w-4 text-primary" />
+                            Dossiers & Workflow
+                        </Link>
+                    </Button>
                     <Button size="sm" variant="outline" className="gap-2 shadow-sm" asChild>
                         <Link to="/rapports">
                             <FileText className="h-4 w-4" />

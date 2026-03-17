@@ -204,7 +204,109 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
-      }
+      },
+      dossiers: {
+        Row: {
+          id: string
+          numero_dossier: string
+          type_demande: string
+          entite_id: string
+          entite_type: string
+          entite_nom: string
+          statut: string
+          priorite: string | null
+          observations: string | null
+          pieces_jointes: Json | null
+          qr_code_url: string | null
+          date_soumission: string
+          updated_at: string
+          valide_par_dsa: string | null
+          valide_par_da: string | null
+          valide_par_djc: string | null
+          valide_par_dsi: string | null
+          valide_par_dg: string | null
+          rccm_url: string | null
+          nif_url: string | null
+          statuts_url: string | null
+          autorisation_url: string | null
+        }
+        Insert: {
+          id?: string
+          numero_dossier: string
+          type_demande: string
+          entite_id: string
+          entite_type: string
+          entite_nom: string
+          statut?: string
+          priorite?: string | null
+          observations?: string | null
+          pieces_jointes?: Json | null
+          qr_code_url?: string | null
+          date_soumission?: string
+          updated_at?: string
+          valide_par_dsa?: string | null
+          valide_par_da?: string | null
+          valide_par_djc?: string | null
+          valide_par_dsi?: string | null
+          rccm_url?: string | null
+          nif_url?: string | null
+          statuts_url?: string | null
+          autorisation_url?: string | null
+        }
+        Update: {
+          id?: string
+          numero_dossier?: string
+          type_demande?: string
+          entite_id?: string
+          entite_type?: string
+          entite_nom?: string
+          statut?: string
+          priorite?: string | null
+          observations?: string | null
+          pieces_jointes?: Json | null
+          qr_code_url?: string | null
+          date_soumission?: string
+          updated_at?: string
+          valide_par_dsa?: string | null
+          valide_par_da?: string | null
+          valide_par_djc?: string | null
+          valide_par_dsi?: string | null
+          rccm_url?: string | null
+          nif_url?: string | null
+          statuts_url?: string | null
+          autorisation_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dossiers_valide_par_djc_fkey"
+            columns: ["valide_par_djc"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dossiers_valide_par_dsa_fkey"
+            columns: ["valide_par_dsa"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dossiers_valide_par_dsi_fkey"
+            columns: ["valide_par_dsi"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dossiers_valide_par_da_fkey"
+            columns: ["valide_par_da"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      },
       livraisons: {
         Row: {
           bon_livraison: string | null
@@ -544,6 +646,31 @@ export type Database = {
       | "personnel_admin"
       | "service_it"
       | "responsable_entreprise"
+      | "directeur_administratif"
+      | "chef_service_administratif"
+      | "agent_administratif"
+      | "gestionnaire_documentaire"
+      | "directeur_logistique"
+      | "agent_logistique"
+      | "responsable_depots"
+      | "responsable_transport"
+      | "operateur_logistique"
+      | "responsable_stock"
+      | "agent_station"
+      | "technicien_aval"
+      | "directeur_juridique"
+      | "juriste"
+      | "charge_conformite"
+      | "assistant_juridique"
+      | "directeur_financier"
+      | "controleur_financier"
+      | "comptable"
+      | "directeur_importation"
+      | "agent_importation"
+      | "secretaire_general"
+      | "responsable_stations"
+      | "gestionnaire_livraisons"
+      | "operateur_entreprise"
     }
     CompositeTypes: {
       [_ in never]: never

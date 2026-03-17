@@ -23,6 +23,42 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth, AppRole } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 
+interface ImportDossier {
+  id: string;
+  numero_dossier: string;
+  statut: string;
+  quantite_prevue: number;
+  port_depart: string | null;
+  port_arrivee: string | null;
+  date_arrivee_est: string;
+  created_at: string;
+  updated_at: string;
+  fournisseur: { nom: string; pays: string } | null;
+  produit: { nom: string } | null;
+}
+
+interface SupplierRef { id: string; nom: string; }
+interface ProductRef { id: string; nom: string; }
+
+interface NewDossier {
+  numero_dossier: FormDataEntryValue | null;
+  fournisseur_id: FormDataEntryValue | null;
+  produit_id: FormDataEntryValue | null;
+  quantite_prevue: number;
+  port_depart: FormDataEntryValue | null;
+  date_arrivee_est: FormDataEntryValue | null;
+  statut: string;
+}
+
+interface StatusUpdate {
+  id: string;
+  status: string;
+  updates?: Record<string, string | null>;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const db = supabase as unknown as { from: (table: string) => any; auth?: { user?: { id: string } } };
+
 export default function ImportDossiersPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
@@ -32,7 +68,7 @@ export default function ImportDossiersPage() {
   const { data: dossiers, isLoading } = useQuery({
     queryKey: ['import-dossiers-workflow'],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await db
         .from('import_dossiers')
         .select(`
           *,
@@ -41,29 +77,29 @@ export default function ImportDossiersPage() {
         `)
         .order('created_at', { ascending: false });
       if (error) throw error;
-      return data || [];
+      return (data as ImportDossier[]) || [];
     }
   });
 
   const { data: suppliers } = useQuery({
     queryKey: ['import-fournisseurs-list'],
     queryFn: async () => {
-      const { data } = await (supabase as any).from('import_fournisseurs').select('id, nom').eq('statut', 'actif');
-      return data || [];
+      const { data } = await db.from('import_fournisseurs').select('id, nom').eq('statut', 'actif');
+      return (data as SupplierRef[]) || [];
     }
   });
 
   const { data: products } = useQuery({
     queryKey: ['import-produits-list'],
     queryFn: async () => {
-      const { data } = await (supabase as any).from('import_produits').select('id, nom');
-      return data || [];
+      const { data } = await db.from('import_produits').select('id, nom');
+      return (data as ProductRef[]) || [];
     }
   });
 
   const createMutation = useMutation({
-    mutationFn: async (newDossier: any) => {
-      const { error } = await (supabase as any)
+    mutationFn: async (newDossier: NewDossier) => {
+      const { error } = await db
         .from('import_dossiers')
         .insert(newDossier);
       if (error) throw error;
@@ -75,8 +111,8 @@ export default function ImportDossiersPage() {
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status, updates = {} }: { id: string, status: string, updates?: any }) => {
-      const { error } = await (supabase as any)
+    mutationFn: async ({ id, status, updates = {} }: StatusUpdate) => {
+      const { error } = await db
         .from('import_dossiers')
         .update({ statut: status, ...updates, updated_at: new Date().toISOString() })
         .eq('id', id);
@@ -113,11 +149,11 @@ export default function ImportDossiersPage() {
 
   const isRole = (roles: AppRole[]) => currentUserRole && roles.includes(currentUserRole);
 
-  const handleAction = (dossier: any) => {
+  const handleAction = (dossier: ImportDossier) => {
     const { id, statut } = dossier;
 
     // 1. Logistique/Import submits to Legal
-    if (statut === 'en_preparation' && isRole(['directeur_importation', 'agent_importation', 'directeur_logistique', 'agent_logistique'])) {
+    if (statut === 'en_preparation' && isRole(['directeur_importation', 'agent_importation', 'directeur_logistique', 'responsable_depots', 'operateur_logistique'])) {
       updateStatusMutation.mutate({ id, status: 'attente_juridique' });
       return;
     }
@@ -127,7 +163,7 @@ export default function ImportDossiersPage() {
       updateStatusMutation.mutate({ 
         id, 
         status: 'attente_paiement', 
-        updates: { valide_juridique_par: (supabase as any).auth?.user?.id || null, valide_juridique_at: new Date().toISOString() } 
+        updates: { valide_juridique_par: db.auth?.user?.id || null, valide_juridique_at: new Date().toISOString() } 
       });
       return;
     }
@@ -137,19 +173,19 @@ export default function ImportDossiersPage() {
       updateStatusMutation.mutate({ 
         id, 
         status: 'en_transport', 
-        updates: { valide_finance_par: (supabase as any).auth?.user?.id || null, valide_finance_at: new Date().toISOString() } 
+        updates: { valide_finance_par: db.auth?.user?.id || null, valide_finance_at: new Date().toISOString() } 
       });
       return;
     }
 
     // 4. Logistique confirms arrival
-    if (statut === 'en_transport' && isRole(['directeur_logistique', 'agent_logistique'])) {
+    if (statut === 'en_transport' && isRole(['directeur_logistique', 'responsable_depots', 'operateur_logistique'])) {
       updateStatusMutation.mutate({ id, status: 'arrive' });
       return;
     }
 
     // 5. Finalize reception (integration in depot stocks handled by database trigger)
-    if (statut === 'arrive' && isRole(['directeur_logistique', 'agent_logistique'])) {
+    if (statut === 'arrive' && isRole(['directeur_logistique', 'responsable_depots', 'operateur_logistique'])) {
       updateStatusMutation.mutate({ id, status: 'receptionne' });
       return;
     }
@@ -157,7 +193,7 @@ export default function ImportDossiersPage() {
     toast({ title: "Action non autorisée", description: "Vous n'avez pas le rôle requis pour cette étape du workflow.", variant: "destructive" });
   };
 
-  const filteredDossiers = dossiers?.filter((d: any) => 
+  const filteredDossiers = dossiers?.filter((d: ImportDossier) => 
     d.numero_dossier.toLowerCase().includes(searchTerm.toLowerCase()) ||
     d.fournisseur?.nom.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -177,7 +213,7 @@ export default function ImportDossiersPage() {
                 <div className="bg-amber-100 p-2 rounded-lg text-amber-600"><ShieldCheck className="h-5 w-5" /></div>
                 <div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">En Revue Légale</p>
-                  <h4 className="text-xl font-black">{dossiers?.filter((d: any) => d.statut === 'attente_juridique').length || 0}</h4>
+                  <h4 className="text-xl font-black">{dossiers?.filter((d: ImportDossier) => d.statut === 'attente_juridique').length || 0}</h4>
                 </div>
               </div>
             </CardContent>
@@ -188,7 +224,7 @@ export default function ImportDossiersPage() {
                 <div className="bg-blue-100 p-2 rounded-lg text-blue-600"><Wallet className="h-5 w-5" /></div>
                 <div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Attente Paiement</p>
-                  <h4 className="text-xl font-black">{dossiers?.filter((d: any) => d.statut === 'attente_paiement').length || 0}</h4>
+                  <h4 className="text-xl font-black">{dossiers?.filter((d: ImportDossier) => d.statut === 'attente_paiement').length || 0}</h4>
                 </div>
               </div>
             </CardContent>
@@ -199,7 +235,7 @@ export default function ImportDossiersPage() {
                 <div className="bg-indigo-100 p-2 rounded-lg text-indigo-600"><Ship className="h-5 w-5" /></div>
                 <div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Navires en Mer</p>
-                  <h4 className="text-xl font-black">{dossiers?.filter((d: any) => d.statut === 'en_transport').length || 0}</h4>
+                  <h4 className="text-xl font-black">{dossiers?.filter((d: ImportDossier) => d.statut === 'en_transport').length || 0}</h4>
                 </div>
               </div>
             </CardContent>
@@ -210,7 +246,7 @@ export default function ImportDossiersPage() {
                 <div className="bg-emerald-100 p-2 rounded-lg text-emerald-600"><Truck className="h-5 w-5" /></div>
                 <div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Réceptionnés (Mois)</p>
-                  <h4 className="text-xl font-black">{dossiers?.filter((d: any) => d.statut === 'receptionne').length || 0}</h4>
+                  <h4 className="text-xl font-black">{dossiers?.filter((d: ImportDossier) => d.statut === 'receptionne').length || 0}</h4>
                 </div>
               </div>
             </CardContent>
@@ -234,7 +270,7 @@ export default function ImportDossiersPage() {
 
           <Dialog>
             <DialogTrigger asChild>
-              {isRole(['directeur_importation', 'agent_importation', 'directeur_logistique']) && (
+              {isRole(['directeur_importation', 'agent_importation', 'directeur_logistique', 'responsable_depots']) && (
                 <Button className="h-12 px-8 rounded-2xl gap-3 shadow-xl shadow-primary/20 bg-primary font-black uppercase text-[10px] tracking-widest">
                   <Plus className="h-4 w-4" /> Initialiser un Dossier
                 </Button>
@@ -269,7 +305,7 @@ export default function ImportDossiersPage() {
                       <SelectValue placeholder="Sélectionner le fournisseur" />
                     </SelectTrigger>
                     <SelectContent>
-                      {suppliers?.map((s: any) => (
+                      {suppliers?.map((s: SupplierRef) => (
                         <SelectItem key={s.id} value={s.id}>{s.nom}</SelectItem>
                       ))}
                     </SelectContent>
@@ -282,7 +318,7 @@ export default function ImportDossiersPage() {
                       <SelectValue placeholder="Produit importé" />
                     </SelectTrigger>
                     <SelectContent>
-                      {products?.map((p: any) => (
+                      {products?.map((p: ProductRef) => (
                         <SelectItem key={p.id} value={p.id}>{p.nom}</SelectItem>
                       ))}
                     </SelectContent>
@@ -332,7 +368,7 @@ export default function ImportDossiersPage() {
                 <TableRow><TableCell colSpan={6} className="text-center py-20"><Loader2 className="animate-spin mx-auto text-primary" size={40} /></TableCell></TableRow>
               ) : filteredDossiers?.length === 0 ? (
                 <TableRow><TableCell colSpan={6} className="text-center py-20 text-slate-400 font-bold uppercase text-xs">Aucun dossier trouvé.</TableCell></TableRow>
-              ) : filteredDossiers?.map((d: any) => {
+              ) : filteredDossiers?.map((d: ImportDossier) => {
                 
                 // Determine action button text and function based on status and role
                 let actionBtnLabel = "Détails";
@@ -340,7 +376,7 @@ export default function ImportDossiersPage() {
                 let actionBtnVariant: "outline" | "default" | "secondary" | "destructive" | "ghost" = "ghost";
                 let showAction = true;
 
-                if (d.statut === 'en_preparation' && isRole(['directeur_importation', 'agent_importation', 'directeur_logistique'])) {
+                if (d.statut === 'en_preparation' && isRole(['directeur_importation', 'agent_importation', 'directeur_logistique', 'responsable_depots'])) {
                   actionBtnLabel = "Soumettre au Juridique";
                   actionBtnIcon = <ShieldCheck className="h-4 w-4" />;
                   actionBtnVariant = "outline";
@@ -352,11 +388,11 @@ export default function ImportDossiersPage() {
                   actionBtnLabel = "Valider Paiement";
                   actionBtnIcon = <Wallet className="h-4 w-4" />;
                   actionBtnVariant = "default";
-                } else if (d.statut === 'en_transport' && isRole(['directeur_logistique', 'agent_logistique'])) {
+                } else if (d.statut === 'en_transport' && isRole(['directeur_logistique', 'responsable_depots', 'operateur_logistique'])) {
                   actionBtnLabel = "Confirmer Arrivée";
                   actionBtnIcon = <Anchor className="h-4 w-4" />;
                   actionBtnVariant = "secondary";
-                } else if (d.statut === 'arrive' && isRole(['directeur_logistique', 'agent_logistique'])) {
+                } else if (d.statut === 'arrive' && isRole(['directeur_logistique', 'responsable_depots', 'operateur_logistique'])) {
                   actionBtnLabel = "Certifier Réception";
                   actionBtnIcon = <CheckCircle2 className="h-4 w-4" />;
                   actionBtnVariant = "default";

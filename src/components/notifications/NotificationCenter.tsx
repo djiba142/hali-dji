@@ -101,7 +101,7 @@ export function NotificationCenter() {
 
       // 2. AUTO-CHECK: Identify low stocks and create missing alerts
       // (Expanded role check to ensure monitoring users trigger alerts)
-      const monitoringRoles = ['super_admin', 'service_it', 'admin_etat', 'inspecteur', 'analyste', 'personnel_admin'];
+      const monitoringRoles = ['super_admin', 'service_it', 'admin_etat', 'inspecteur', 'analyste', 'directeur_administratif', 'directeur_logistique', 'responsable_depots'];
       if (role && monitoringRoles.includes(role)) {
         const { data: stations } = await supabase.from('stations').select('id, nom, stock_essence, capacite_essence, stock_gasoil, capacite_gasoil, entreprise_id');
 

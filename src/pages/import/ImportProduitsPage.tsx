@@ -21,6 +21,30 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
+interface ImportProduit {
+  id: string;
+  nom: string;
+  type: string;
+  densite: string;
+  statut: string;
+  description: string | null;
+}
+
+interface NewProduit {
+  nom: FormDataEntryValue | null;
+  type: FormDataEntryValue | null;
+  densite: FormDataEntryValue | null;
+  statut: string;
+  description: FormDataEntryValue | null;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const db = supabase as unknown as { from: (table: string) => any };
+
+function cn(...classes: (string | boolean | undefined | null)[]) {
+  return classes.filter(Boolean).join(' ');
+}
+
 export default function ImportProduitsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
@@ -33,13 +57,13 @@ export default function ImportProduitsPage() {
     queryFn: async () => {
       // Mock data if table doesn't exist, otherwise fetch
       try {
-        const { data, error } = await (supabase as any)
+        const { data, error } = await db
           .from('import_produits')
           .select('*')
           .order('nom', { ascending: true });
         
         if (error) throw error;
-        return data || [];
+        return (data as ImportProduit[]) || [];
       } catch (err) {
         console.warn("Table import_produits not found, using default assets.");
         return [
@@ -48,14 +72,14 @@ export default function ImportProduitsPage() {
           { id: '3', nom: 'Jet A1', type: 'aviation', densite: '0.80', statut: 'actif', description: 'Kérosène pour l\'aviation commerciale.' },
           { id: '4', nom: 'Fuel Oil (HFO)', type: 'industriel', densite: '0.98', statut: 'actif', description: 'Combustible lourd pour centrales thermiques.' },
           { id: '5', nom: 'Bitume', type: 'industriel', densite: '1.02', statut: 'actif', description: 'Utilisé pour les travaux routiers.' },
-        ];
+        ] as ImportProduit[];
       }
     }
   });
 
   const createMutation = useMutation({
-    mutationFn: async (newProduct: any) => {
-      const { error } = await (supabase as any)
+    mutationFn: async (newProduct: NewProduit) => {
+      const { error } = await db
         .from('import_produits')
         .insert(newProduct);
       if (error) throw error;
@@ -69,7 +93,7 @@ export default function ImportProduitsPage() {
     }
   });
 
-  const filteredProduits = produits?.filter((p: any) => 
+  const filteredProduits = produits?.filter((p: ImportProduit) => 
     p.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.type.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -189,7 +213,7 @@ export default function ImportProduitsPage() {
                                         </div>
                                     </TableCell>
                                 </TableRow>
-                            ) : filteredProduits?.map((p: any) => (
+                            ) : filteredProduits?.map((p: ImportProduit) => (
                                 <TableRow key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-white/5 transition-colors group">
                                     <TableCell className="px-8 py-5">
                                         <div className="flex items-center gap-4">
@@ -283,8 +307,4 @@ export default function ImportProduitsPage() {
       </div>
     </DashboardLayout>
   );
-}
-
-function cn(...classes: any[]) {
-  return classes.filter(Boolean).join(' ');
 }

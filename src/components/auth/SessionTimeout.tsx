@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
-const INACTIVITY_TIMEOUT = 10 * 60 * 1000; // 10 minutes
+const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 const WARNING_BEFORE = 60 * 1000; // 1 minute warning before logout
 
 export const SessionTimeout = () => {

@@ -49,7 +49,7 @@ type AuditRowData = {
 };
 
 export default function AuditPage() {
-  const { role: currentUserRole } = useAuth();
+  const { role: currentUserRole, profile } = useAuth();
   const [logs, setLogs] = useState<AuditRowData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -151,6 +151,7 @@ export default function AuditPage() {
       headers,
       data,
       signerRole: currentUserRole || 'admin_etat',
+      signerName: profile?.full_name || 'Administrateur SIHG',
       sheetName: 'Logs Audit'
     });
 

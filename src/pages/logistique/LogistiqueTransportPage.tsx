@@ -100,8 +100,19 @@ export default function LogistiqueTransportPage() {
   );
 }
 
-function TransportCard({ id, from, to, product, quantity, trucks, status, eta }: any) {
-  const statusConfig: any = {
+interface TransportCardProps {
+  id: string;
+  from: string;
+  to: string;
+  product: string;
+  quantity: string;
+  trucks: number;
+  status: string;
+  eta: string;
+}
+
+function TransportCard({ id, from, to, product, quantity, trucks, status, eta }: TransportCardProps) {
+  const statusConfig: Record<string, string> = {
     en_transit: "bg-blue-50 text-blue-600 border-blue-100",
     prevu: "bg-slate-50 text-slate-500 border-slate-100",
     termine: "bg-emerald-50 text-emerald-600 border-emerald-100"

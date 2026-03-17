@@ -15,32 +15,45 @@ declare module 'jspdf' {
 
 // ── Rôles supportés ────────────────────────────────────────────
 export type AppRole =
-  | 'super_admin' | 'admin_etat' | 'directeur_general' | 'directeur_adjoint'
+  | 'super_admin' | 'admin_etat' | 'directeur_general' | 'directeur_adjoint' | 'secretaire_general'
   | 'directeur_aval' | 'directeur_adjoint_aval' | 'chef_division_distribution' | 'chef_bureau_aval'
   | 'agent_supervision_aval' | 'controleur_distribution' | 'technicien_support_dsa' | 'technicien_flux'
   | 'inspecteur' | 'analyste'
-  | 'personnel_admin' | 'service_it' | 'responsable_entreprise'
+  | 'service_it' | 'responsable_entreprise' | 'responsable_stations' | 'gestionnaire_livraisons'
   | 'technicien_aval' | 'operateur_entreprise'
   | 'directeur_juridique' | 'juriste' | 'charge_conformite' | 'assistant_juridique'
   | 'directeur_financier' | 'controleur_financier' | 'comptable'
-  | 'directeur_importation' | 'agent_importation' | 'directeur_logistique' | 'agent_logistique';
+  | 'directeur_importation' | 'agent_importation' 
+  | 'directeur_administratif' | 'chef_service_administratif' | 'agent_administratif' | 'gestionnaire_documentaire'
+  | 'directeur_logistique' | 'responsable_depots' | 'responsable_transport' | 'operateur_logistique';
 
 const ROLE_SIGNATURE: Record<string, { gauche: string; droite: string }> = {
-  directeur_general:  { gauche: '',  droite: "SIGNATURE" },
-  directeur_adjoint:  { gauche: '', droite: "SIGNATURE" },
-  admin_etat:         { gauche: '', droite: "SIGNATURE" },
-  directeur_aval:     { gauche: '', droite: "SIGNATURE" },
-  directeur_adjoint_aval: { gauche: '', droite: "SIGNATURE" },
-  inspecteur:         { gauche: '', droite: "SIGNATURE" },
-  analyste:           { gauche: '', droite: "SIGNATURE" },
-  personnel_admin:    { gauche: '', droite: "SIGNATURE" },
-  service_it:         { gauche: '', droite: "SIGNATURE" },
-  responsable_entreprise: { gauche: '', droite: "SIGNATURE" },
-  operateur_entreprise:   { gauche: '', droite: "SIGNATURE" },
-
-  technicien_aval:    { gauche: '', droite: "SIGNATURE" },
-  super_admin:        { gauche: '', droite: "SIGNATURE" },
-  DG:                 { gauche: '', droite: "SIGNATURE" },
+  directeur_general:  { gauche: '',  droite: "LE DIRECTEUR GENERAL" },
+  directeur_adjoint:  { gauche: '', droite: "LE DIRECTEUR GENERAL ADJOINT" },
+  admin_etat:         { gauche: '', droite: "L'ADMINISTRATEUR D'ETAT (SONAP)" },
+  directeur_aval:     { gauche: '', droite: "LE DIRECTEUR DE L'AVAL" },
+  directeur_adjoint_aval: { gauche: '', droite: "LE DIRECTEUR ADJOINT DE L'AVAL" },
+  chef_division_distribution: { gauche: '', droite: "LE CHEF DIVISION DISTRIBUTION" },
+  inspecteur:         { gauche: '', droite: "L'INSPECTEUR SIHG" },
+  analyste:           { gauche: '', droite: "L'ANALYSTE STRATEGIQUE" },
+  directeur_administratif: { gauche: '', droite: "LE DIRECTEUR ADMINISTRATIF" },
+  chef_service_administratif: { gauche: '', droite: "LE CHEF SERVICE ADMINISTRATIF" },
+  agent_administratif: { gauche: '', droite: "L'AGENT ADMINISTRATIF" },
+  gestionnaire_documentaire: { gauche: '', droite: "LE GESTIONNAIRE DOCUMENTAIRE" },
+  service_it:         { gauche: '', droite: "LE RESPONSABLE S.I." },
+  responsable_entreprise: { gauche: '', droite: "LE DIRECTEUR D'ENTREPRISE" },
+  responsable_stations:   { gauche: '', droite: "LE RESPONSABLE STATIONS" },
+  gestionnaire_livraisons: { gauche: '', droite: "LE GESTIONNAIRE LIVRAISONS" },
+  operateur_entreprise:   { gauche: '', droite: "L'OPERATEUR LOGISTIQUE" },
+  secretaire_general:     { gauche: '', droite: "LE SECRETAIRE GENERAL" },
+  super_admin:            { gauche: '', droite: "L'ADMINISTRATEUR SYSTEME" },
+  directeur_juridique:    { gauche: '', droite: "LE DIRECTEUR JURIDIQUE" },
+  directeur_financier:    { gauche: '', droite: "LE DIRECTEUR FINANCIER" },
+  directeur_importation:  { gauche: '', droite: "LE DIRECTEUR DES IMPORTATIONS" },
+  directeur_logistique:   { gauche: '', droite: "LE DIRECTEUR LOGISTIQUE" },
+  responsable_depots:     { gauche: '', droite: "LE RESPONSABLE DES DEPOTS" },
+  responsable_transport:  { gauche: '', droite: "LE RESPONSABLE TRANSPORT" },
+  operateur_logistique:   { gauche: '', droite: "L'OPERATEUR LOGISTIQUE" },
   DGA:                { gauche: '', droite: "SIGNATURE" },
   DSA:                { gauche: '', droite: "SIGNATURE" },
 };
@@ -72,9 +85,10 @@ const formatNumber = (val: number): string => {
 // ── Cache logos ─────────────────────────────────────────────────
 let _cacheSihg: string | null = null;
 let _cacheSonap: string | null = null;
+let _cacheEntreprise: string | null = null;
 
-const getLogoBase64 = (url: string, type: 'sihg' | 'sonap'): Promise<string | null> => {
-  const cached = type === 'sihg' ? _cacheSihg : _cacheSonap;
+const getLogoBase64 = (url: string, type: 'sihg' | 'sonap' | 'entreprise'): Promise<string | null> => {
+  const cached = type === 'sihg' ? _cacheSihg : type === 'sonap' ? _cacheSonap : _cacheEntreprise;
   if (cached) return Promise.resolve(cached);
   return new Promise((resolve) => {
     const t = setTimeout(() => resolve(null), 4000);
@@ -90,7 +104,9 @@ const getLogoBase64 = (url: string, type: 'sihg' | 'sonap'): Promise<string | nu
         if (!ctx) return resolve(null);
         ctx.drawImage(img, 0, 0);
         const b64 = c.toDataURL('image/png');
-        if (type === 'sihg') _cacheSihg = b64; else _cacheSonap = b64;
+        if (type === 'sihg') _cacheSihg = b64; 
+        else if (type === 'sonap') _cacheSonap = b64;
+        else _cacheEntreprise = b64;
         resolve(b64);
       } catch { resolve(null); }
     };
@@ -142,7 +158,7 @@ const addPageHeader = async (doc: jsPDF, reportTitle: string, entrepriseLogo?: s
   // Logo Entreprise (si fourni)
   if (entrepriseLogo) {
     try {
-      const b = await getLogoBase64(entrepriseLogo, 'sonap'); // use sonap cache logic for simplicity or no cache
+      const b = await getLogoBase64(entrepriseLogo, 'entreprise'); 
       if (b) doc.addImage(b, 'PNG', W-81, STRIP+4, 22, 22, undefined, 'FAST');
     } catch { /* ignore */ }
   }
@@ -200,13 +216,20 @@ const addPageHeader = async (doc: jsPDF, reportTitle: string, entrepriseLogo?: s
 const addSignaturesAtBottom = (doc: jsPDF, signerRole?: string, signerName?: string) => {
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
-  const SIG_H = 45;
+  const SIG_H = 50;
+  
+  // Sécurité: Si le contenu (tableau) termine trop bas, on change de page
+  const finalY = (doc as any).lastAutoTable?.finalY || 0;
+  if (finalY > H - SIG_H - 20) {
+    doc.addPage();
+  }
+
   let sigY = H - SIG_H;
 
-  // Ligne de separation
-  doc.setDrawColor(220, 220, 220);
-  doc.setLineWidth(0.3);
-  doc.line(15, sigY - 4, W - 15, sigY - 4);
+  // Ligne de separation fine
+  doc.setDrawColor(230, 230, 230);
+  doc.setLineWidth(0.2);
+  doc.line(20, sigY - 5, W - 20, sigY - 5);
 
   const role = signerRole || 'directeur_general';
   
@@ -215,11 +238,13 @@ const addSignaturesAtBottom = (doc: jsPDF, signerRole?: string, signerName?: str
   doc.setTextColor(...C.darkText);
 
   // Logic pour Double Validation (4 yeux)
-  const needsDoubleValidation = ['admin_etat', 'directeur_aval', 'directeur_general'].includes(role);
+  const needsDoubleValidation = ['admin_etat', 'directeur_aval', 'directeur_general', 'secretaire_general', 'directeur_financier', 'directeur_importation', 'directeur_logistique', 'super_admin'].includes(role);
 
   if (needsDoubleValidation) {
+     const sig = ROLE_SIGNATURE[role] || { gauche: '', droite: "L'AUTORITE COMPETENTE" };
+     
      // Slot 1: L'auteur
-     doc.text("L'AUTEUR DU RAPPORT", 50, sigY + 5, { align: 'center' });
+     doc.text("L'ETABLISSEUR DU RAPPORT", 50, sigY + 5, { align: 'center' });
      doc.setFont('helvetica', 'normal');
      doc.setFontSize(7);
      doc.text(normalize(signerName || 'Agent Certifie'), 50, sigY + 10, { align: 'center' });
@@ -228,20 +253,39 @@ const addSignaturesAtBottom = (doc: jsPDF, signerRole?: string, signerName?: str
      // Slot 2: Autorite de Controle
      doc.setFont('helvetica', 'bold');
      doc.setFontSize(9);
-     doc.text("CONTROLE & VALIDATION (SONAP)", W - 50, sigY + 5, { align: 'center' });
+     doc.text(normalize(sig.droite), W - 50, sigY + 5, { align: 'center' });
      doc.line(W - 80, sigY + 28, W - 20, sigY + 28);
      
-     // Sceau de securite
+     // Sceau de securite amélioré
      doc.setDrawColor(...C.guineaGreen);
-     doc.setLineWidth(0.5);
-     doc.circle(W/2, sigY + 15, 8);
-     doc.setFontSize(6);
-     doc.text("SCEAU", W/2, sigY + 14, { align: 'center' });
-     doc.text("OFFICIEL", W/2, sigY + 17, { align: 'center' });
+     doc.setLineWidth(0.8);
+     doc.circle(W/2, sigY + 22, 12);
+     doc.setLineWidth(0.2);
+     doc.circle(W/2, sigY + 22, 10);
+     
+     doc.setFontSize(5);
+     doc.setFont('helvetica', 'bold');
+     doc.text("SCEAU OFFICIEL", W/2, sigY + 20, { align: 'center' });
+     doc.text("VALIDE PAR SIHG", W/2, sigY + 23, { align: 'center' });
+     doc.setFontSize(4);
+     doc.text("SONAP REPUBLIQUE DE GUINEE", W/2, sigY + 26, { align: 'center' });
   } else {
-     const sig = ROLE_SIGNATURE[role] || ROLE_SIGNATURE['directeur_general'];
-     doc.text(normalize(sig.droite), W - 20, sigY + 5, { align: 'right' });
-     doc.line(W - 90, sigY + 28, W - 20, sigY + 28);
+     const sig = ROLE_SIGNATURE[role] || { gauche: '', droite: "SIGNATURE" };
+     doc.text(normalize(sig.droite), W - 50, sigY + 5, { align: 'center' });
+     
+     doc.setFont('helvetica', 'normal');
+     doc.setFontSize(7);
+     doc.text(normalize(signerName || 'Agent Certifie'), W - 50, sigY + 10, { align: 'center' });
+     
+     doc.line(W - 80, sigY + 28, W - 20, sigY + 28);
+     
+     // Petit sceau certifié
+     doc.setDrawColor(...C.guineaGreen);
+     doc.setLineWidth(0.4);
+     doc.circle(30, sigY + 22, 9);
+     doc.setFontSize(5);
+     doc.text("CERTIFIE", 30, sigY + 21, { align: 'center' });
+     doc.text("SIHG-SONAP", 30, sigY + 24, { align: 'center' });
   }
 };
 

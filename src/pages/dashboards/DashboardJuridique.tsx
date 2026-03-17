@@ -251,7 +251,7 @@ export default function DashboardJuridique() {
       {/* Quick Access Modules */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
         {[
-          { label: 'Dossiers', icon: FolderOpen, path: '/juridique/dossiers', color: 'bg-indigo-50 text-indigo-600 border-indigo-100' },
+          { label: 'Workflow', icon: FolderOpen, path: '/administratif/dossiers', color: 'bg-indigo-50 text-indigo-600 border-indigo-100' },
           { label: 'Contrats', icon: FileText, path: '/juridique/contrats', color: 'bg-emerald-50 text-emerald-600 border-emerald-100' },
           { label: 'Conformité', icon: ShieldCheck, path: '/juridique/conformite', color: 'bg-blue-50 text-blue-600 border-blue-100' },
           { label: 'Litiges', icon: Gavel, path: '/juridique/litiges', color: 'bg-red-50 text-red-600 border-red-100' },

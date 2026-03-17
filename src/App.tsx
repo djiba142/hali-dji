@@ -58,9 +58,10 @@ const DashboardSuperAdmin = lazy(() => import("@/pages/dashboards/DashboardSuper
 const DashboardAdminEtat = lazy(() => import("@/pages/dashboards/DashboardAdminEtat"));
 const DashboardInspecteur = lazy(() => import("@/pages/dashboards/DashboardInspecteur"));
 const DashboardAnalyste = lazy(() => import("@/pages/dashboards/DashboardAnalyste"));
-const DashboardPersonnelAdmin = lazy(() => import("@/pages/dashboards/DashboardPersonnelAdmin"));
 const DashboardServiceIT = lazy(() => import("@/pages/dashboards/DashboardServiceIT"));
 const DashboardDSA = lazy(() => import("@/pages/dashboards/DashboardDSA"));
+const DashboardAdministratif = lazy(() => import("@/pages/dashboards/DashboardAdministratif"));
+const DashboardLogistique = lazy(() => import("@/pages/dashboards/DashboardLogistique"));
 
 // Intelligence & Analyse
 const StatistiquesPage = lazy(() => import("@/pages/analyste/StatistiquesPage"));
@@ -69,7 +70,6 @@ const PrevisionsPage = lazy(() => import("@/pages/analyste/PrevisionsPage"));
 const DashboardJuridique = lazy(() => import("@/pages/dashboards/DashboardJuridique"));
 const DashboardFinance = lazy(() => import("@/pages/dashboards/DashboardFinance"));
 const DashboardImportation = lazy(() => import("./pages/dashboards/DashboardImportation"));
-const DashboardLogistique = lazy(() => import("./pages/dashboards/DashboardLogistique"));
 
 // Finance Pages
 const FinanceBudgetsPage = lazy(() => import("@/pages/finance/FinanceBudgetsPage"));
@@ -97,6 +97,8 @@ const JuridiqueArchivesPage = lazy(() => import("./pages/juridique/ArchivesPage"
 const LogistiqueDepotsPage = lazy(() => import("@/pages/logistique/LogistiqueDepotsPage"));
 const LogistiqueReceptionsPage = lazy(() => import("./pages/logistique/LogistiqueReceptionsPage"));
 const LogistiqueTransportPage = lazy(() => import("./pages/logistique/LogistiqueTransportPage"));
+
+const AdminDossiersPage = lazy(() => import("./pages/AdminDossiersPage"));
 
 // Loading component for lazy-loaded pages
 const PageLoader = () => (
@@ -132,11 +134,9 @@ const App = () => (
       <ThemeProvider defaultTheme="light" storageKey="sihg-ui-theme">
         <TooltipProvider>
           <AuthProvider>
-          <SessionLockOverlay />
-          <Toaster />
+            <Toaster />
           <Sonner />
             <BrowserRouter>
-              <SessionTimeout />
               <Routes>
                 {/* Public routes - eager loaded */}
                 <Route path="/" element={<LandingPage />} />
@@ -170,9 +170,14 @@ const App = () => (
                       'directeur_aval', 'directeur_adjoint_aval', 'chef_division_distribution', 'chef_bureau_aval', 'agent_supervision_aval', 'controleur_distribution', 'technicien_support_dsa', 'technicien_flux', 'inspecteur', 'analyste', 
                       'personnel_admin', 'service_it', 'responsable_entreprise', 
                       'operateur_entreprise',
+                      'secretaire_general',
                       'directeur_juridique', 'juriste', 'charge_conformite', 'assistant_juridique',
                       'directeur_financier', 'controleur_financier', 'comptable',
-                      'directeur_importation', 'agent_importation', 'directeur_logistique', 'agent_logistique'
+                      'directeur_importation', 'agent_importation', 
+                      'responsable_stations', 'gestionnaire_livraisons',
+                      'directeur_administratif', 'chef_service_administratif', 'agent_administratif', 'gestionnaire_documentaire',
+                      'directeur_logistique', 'agent_logistique', 'responsable_depots', 'responsable_transport', 'operateur_logistique',
+                      'personnel_admin'
                     ]} />
                   </ProtectedRoute>
                 }>
@@ -191,7 +196,7 @@ const App = () => (
                 {/* Dashboard Administrateur État (SONAP) */}
                 <Route path="/dashboard/admin-etat" element={
                   <ProtectedRoute>
-                    <RequireRole allowedRoles={['directeur_general', 'directeur_adjoint', 'admin_etat', 'super_admin']} />
+                    <RequireRole allowedRoles={['directeur_general', 'directeur_adjoint', 'admin_etat', 'secretaire_general', 'super_admin']} />
                   </ProtectedRoute>
                 }>
                   <Route index element={<Suspense fallback={<PageLoader />}><DashboardAdminEtat /></Suspense>} />
@@ -225,15 +230,6 @@ const App = () => (
                   <Route index element={<Suspense fallback={<PageLoader />}><DashboardAnalyste /></Suspense>} />
                 </Route>
 
-                {/* Dashboard Personnel Admin SONAP */}
-                <Route path="/dashboard/personnel-admin" element={
-                  <ProtectedRoute>
-                    <RequireRole allowedRoles={['personnel_admin', 'super_admin']} />
-                  </ProtectedRoute>
-                }>
-                  <Route index element={<Suspense fallback={<PageLoader />}><DashboardPersonnelAdmin /></Suspense>} />
-                </Route>
-
                 {/* Dashboard Juridique & Conformité */}
                 <Route path="/dashboard/juridique" element={
                   <ProtectedRoute>
@@ -246,7 +242,7 @@ const App = () => (
                 {/* Dashboard Finance (DAF) */}
                 <Route path="/dashboard/finance" element={
                   <ProtectedRoute>
-                    <RequireRole allowedRoles={['directeur_financier', 'controleur_financier', 'comptable', 'super_admin']} />
+                    <RequireRole allowedRoles={['directeur_financier', 'controleur_financier', 'comptable', 'super_admin', 'secretaire_general', 'directeur_general', 'directeur_adjoint', 'agent_administratif']} />
                   </ProtectedRoute>
                 }>
                   <Route index element={<Suspense fallback={<PageLoader />}><DashboardFinance /></Suspense>} />
@@ -255,10 +251,67 @@ const App = () => (
                 {/* Dashboard Importation */}
                 <Route path="/dashboard/importation" element={
                   <ProtectedRoute>
-                    <RequireRole allowedRoles={['directeur_importation', 'agent_importation', 'super_admin', 'directeur_general', 'directeur_adjoint', 'admin_etat', 'directeur_aval', 'directeur_adjoint_aval', 'chef_division_distribution']} />
+                    <RequireRole allowedRoles={['directeur_importation', 'agent_importation', 'super_admin', 'directeur_general', 'directeur_adjoint', 'admin_etat', 'secretaire_general', 'directeur_aval', 'directeur_adjoint_aval', 'chef_division_distribution']} />
                   </ProtectedRoute>
                 }>
                   <Route index element={<Suspense fallback={<PageLoader />}><DashboardImportation /></Suspense>} />
+                </Route>
+
+                {/* Dashboard Administratif */}
+                <Route path="/dashboard/administratif" element={
+                  <ProtectedRoute>
+                    <RequireRole allowedRoles={['directeur_administratif', 'chef_service_administratif', 'agent_administratif', 'gestionnaire_documentaire', 'personnel_admin', 'super_admin']} />
+                  </ProtectedRoute>
+                }>
+                  <Route index element={<Suspense fallback={<PageLoader />}><DashboardAdministratif /></Suspense>} />
+                </Route>
+
+                {/* Workflow Dossiers SIHG - Accès partagé */}
+                <Route path="/administratif/dossiers" element={
+                  <ProtectedRoute>
+                    <RequireRole allowedRoles={[
+                      'super_admin', 'directeur_general', 'directeur_adjoint', 'admin_etat', 'secretaire_general',
+                      'directeur_administratif', 'chef_service_administratif', 'agent_administratif', 'gestionnaire_documentaire',
+                      'directeur_aval', 'directeur_adjoint_aval', 'chef_bureau_aval',
+                      'directeur_juridique', 'juriste', 'charge_conformite', 'personnel_admin'
+                    ]} />
+                  </ProtectedRoute>
+                }>
+                  <Route index element={<Suspense fallback={<PageLoader />}><AdminDossiersPage /></Suspense>} />
+                </Route>
+
+                {/* Dashboard Logistique */}
+                <Route path="/dashboard/logistique" element={
+                  <ProtectedRoute>
+                    <RequireRole allowedRoles={['directeur_logistique', 'agent_logistique', 'responsable_depots', 'responsable_transport', 'operateur_logistique', 'super_admin']} />
+                  </ProtectedRoute>
+                }>
+                  <Route index element={<Suspense fallback={<PageLoader />}><DashboardLogistique /></Suspense>} />
+                </Route>
+
+                {/* Logistique Sub-Pages */}
+                <Route path="/logistique/depots" element={
+                  <ProtectedRoute>
+                    <RequireRole allowedRoles={['directeur_logistique', 'responsable_depots', 'super_admin', 'directeur_general', 'directeur_adjoint']} />
+                  </ProtectedRoute>
+                }>
+                  <Route index element={<Suspense fallback={<PageLoader />}><LogistiqueDepotsPage /></Suspense>} />
+                </Route>
+
+                <Route path="/logistique/transport" element={
+                  <ProtectedRoute>
+                    <RequireRole allowedRoles={['directeur_logistique', 'responsable_transport', 'super_admin', 'directeur_general', 'directeur_adjoint', 'responsable_entreprise', 'operateur_entreprise', 'gestionnaire_livraisons']} />
+                  </ProtectedRoute>
+                }>
+                  <Route index element={<Suspense fallback={<PageLoader />}><LogistiqueTransportPage /></Suspense>} />
+                </Route>
+
+                <Route path="/logistique/receptions" element={
+                  <ProtectedRoute>
+                    <RequireRole allowedRoles={['directeur_logistique', 'agent_logistique', 'operateur_logistique', 'super_admin', 'directeur_general', 'directeur_adjoint']} />
+                  </ProtectedRoute>
+                }>
+                  <Route index element={<Suspense fallback={<PageLoader />}><LogistiqueReceptionsPage /></Suspense>} />
                 </Route>
 
                 <Route path="/importations/fournisseurs" element={
@@ -291,39 +344,6 @@ const App = () => (
                   </ProtectedRoute>
                 }>
                   <Route index element={<Suspense fallback={<PageLoader />}><ImportProduitsPage /></Suspense>} />
-                </Route>
-
-                {/* Dashboard Logistique */}
-                <Route path="/dashboard/logistique" element={
-                  <ProtectedRoute>
-                    <RequireRole allowedRoles={['directeur_logistique', 'agent_logistique', 'super_admin', 'directeur_general', 'directeur_adjoint', 'admin_etat']} />
-                  </ProtectedRoute>
-                }>
-                  <Route index element={<Suspense fallback={<PageLoader />}><DashboardLogistique /></Suspense>} />
-                </Route>
-
-                <Route path="/logistique/depots" element={
-                  <ProtectedRoute>
-                    <RequireRole allowedRoles={['directeur_logistique', 'agent_logistique', 'super_admin', 'directeur_general', 'directeur_adjoint', 'admin_etat', 'directeur_aval', 'technicien_flux']} />
-                  </ProtectedRoute>
-                }>
-                  <Route index element={<Suspense fallback={<PageLoader />}><LogistiqueDepotsPage /></Suspense>} />
-                </Route>
-
-                <Route path="/logistique/receptions" element={
-                  <ProtectedRoute>
-                    <RequireRole allowedRoles={['directeur_logistique', 'agent_logistique', 'super_admin', 'directeur_general', 'directeur_adjoint', 'admin_etat']} />
-                  </ProtectedRoute>
-                }>
-                  <Route index element={<Suspense fallback={<PageLoader />}><LogistiqueReceptionsPage /></Suspense>} />
-                </Route>
-
-                <Route path="/logistique/transport" element={
-                  <ProtectedRoute>
-                    <RequireRole allowedRoles={['directeur_logistique', 'agent_logistique', 'super_admin', 'directeur_general', 'directeur_adjoint', 'admin_etat']} />
-                  </ProtectedRoute>
-                }>
-                  <Route index element={<Suspense fallback={<PageLoader />}><LogistiqueTransportPage /></Suspense>} />
                 </Route>
 
                 {/* Module Juridique & Conformité */}
@@ -411,7 +431,7 @@ const App = () => (
                 {/* Dashboard Entreprise */}
                 <Route path="/dashboard/entreprise" element={
                   <ProtectedRoute>
-                    <RequireRole allowedRoles={['responsable_entreprise', 'super_admin']} />
+                    <RequireRole allowedRoles={['responsable_entreprise', 'responsable_stations', 'gestionnaire_livraisons', 'super_admin']} />
                   </ProtectedRoute>
                 }>
                   <Route index element={<Suspense fallback={<PageLoader />}><DashboardEntreprise /></Suspense>} />
@@ -427,7 +447,7 @@ const App = () => (
                 {/* Carte : Tous les rôles métier et stratégiques */}
                 <Route path="/carte" element={
                   <ProtectedRoute>
-                    <RequireRole allowedRoles={['super_admin', 'directeur_general', 'directeur_adjoint', 'admin_etat', 'directeur_aval', 'directeur_adjoint_aval', 'chef_bureau_aval', 'agent_supervision_aval', 'technicien_flux', 'inspecteur', 'analyste', 'responsable_entreprise', 'operateur_entreprise', 'personnel_admin', 'directeur_logistique', 'directeur_importation', 'directeur_juridique', 'directeur_financier']} />
+                    <RequireRole allowedRoles={['super_admin', 'directeur_general', 'directeur_adjoint', 'admin_etat', 'secretaire_general', 'directeur_aval', 'directeur_adjoint_aval', 'chef_bureau_aval', 'agent_supervision_aval', 'technicien_flux', 'inspecteur', 'analyste', 'responsable_entreprise', 'responsable_stations', 'gestionnaire_livraisons', 'operateur_entreprise', 'directeur_importation', 'directeur_juridique', 'directeur_financier']} />
                   </ProtectedRoute>
                 }>
                   <Route index element={<Suspense fallback={<PageLoader />}><CartePage /></Suspense>} />
@@ -436,7 +456,7 @@ const App = () => (
                 {/* Entreprises : Admin + Inspecteur (lecture) + Analyste (lecture) + Personnel Admin + Directeurs */}
                 <Route path="/entreprises" element={
                   <ProtectedRoute>
-                    <RequireRole allowedRoles={['super_admin', 'directeur_general', 'directeur_adjoint', 'admin_etat', 'directeur_aval', 'directeur_adjoint_aval', 'chef_division_distribution', 'chef_bureau_aval', 'agent_supervision_aval', 'inspecteur', 'analyste', 'personnel_admin', 'directeur_juridique', 'juriste', 'directeur_importation', 'directeur_logistique']} />
+                    <RequireRole allowedRoles={['super_admin', 'directeur_general', 'directeur_adjoint', 'admin_etat', 'secretaire_general', 'directeur_aval', 'directeur_adjoint_aval', 'chef_division_distribution', 'chef_bureau_aval', 'agent_supervision_aval', 'inspecteur', 'analyste', 'directeur_juridique', 'juriste', 'directeur_importation']} />
                   </ProtectedRoute>
                 }>
                   <Route index element={<Suspense fallback={<PageLoader />}><EntreprisesPage /></Suspense>} />
@@ -444,7 +464,7 @@ const App = () => (
 
                 <Route path="/entreprises/:id" element={
                   <ProtectedRoute>
-                    <RequireRole allowedRoles={['super_admin', 'directeur_general', 'directeur_adjoint', 'admin_etat', 'directeur_aval', 'directeur_adjoint_aval', 'chef_division_distribution', 'chef_bureau_aval', 'agent_supervision_aval', 'inspecteur', 'analyste', 'responsable_entreprise', 'operateur_entreprise', 'personnel_admin', 'directeur_juridique', 'juriste', 'directeur_financier', 'directeur_importation', 'directeur_logistique']} />
+                    <RequireRole allowedRoles={['super_admin', 'directeur_general', 'directeur_adjoint', 'admin_etat', 'directeur_aval', 'directeur_adjoint_aval', 'chef_division_distribution', 'chef_bureau_aval', 'agent_supervision_aval', 'inspecteur', 'analyste', 'responsable_entreprise', 'operateur_entreprise', 'directeur_juridique', 'juriste', 'directeur_financier', 'directeur_importation']} />
                   </ProtectedRoute>
                 }>
                   <Route index element={<Suspense fallback={<PageLoader />}><EntrepriseDetailPage /></Suspense>} />
@@ -453,7 +473,7 @@ const App = () => (
                 {/* Stations : Tous sauf Service IT et Personnel Admin */}
                 <Route path="/stations" element={
                   <ProtectedRoute>
-                    <RequireRole allowedRoles={['super_admin', 'directeur_general', 'directeur_adjoint', 'admin_etat', 'directeur_aval', 'directeur_adjoint_aval', 'chef_bureau_aval', 'agent_supervision_aval', 'inspecteur', 'analyste', 'responsable_entreprise', 'operateur_entreprise', 'personnel_admin', 'directeur_juridique', 'directeur_logistique']} />
+                    <RequireRole allowedRoles={['super_admin', 'directeur_general', 'directeur_adjoint', 'admin_etat', 'secretaire_general', 'directeur_aval', 'directeur_adjoint_aval', 'chef_bureau_aval', 'agent_supervision_aval', 'inspecteur', 'analyste', 'responsable_entreprise', 'responsable_stations', 'gestionnaire_livraisons', 'operateur_entreprise', 'directeur_juridique']} />
                   </ProtectedRoute>
                 }>
                   <Route index element={<Suspense fallback={<PageLoader />}><StationsPage /></Suspense>} />
@@ -461,7 +481,7 @@ const App = () => (
 
                 <Route path="/stations/:id" element={
                   <ProtectedRoute>
-                    <RequireRole allowedRoles={['super_admin', 'directeur_general', 'directeur_adjoint', 'admin_etat', 'directeur_aval', 'directeur_adjoint_aval', 'chef_bureau_aval', 'agent_supervision_aval', 'inspecteur', 'analyste', 'responsable_entreprise', 'operateur_entreprise']} />
+                    <RequireRole allowedRoles={['super_admin', 'directeur_general', 'directeur_adjoint', 'admin_etat', 'secretaire_general', 'directeur_aval', 'directeur_adjoint_aval', 'chef_bureau_aval', 'agent_supervision_aval', 'inspecteur', 'analyste', 'responsable_entreprise', 'responsable_stations', 'gestionnaire_livraisons', 'operateur_entreprise']} />
                   </ProtectedRoute>
                 }>
                   <Route index element={<Suspense fallback={<PageLoader />}><StationDetailPage /></Suspense>} />
@@ -470,7 +490,7 @@ const App = () => (
                 {/* Alertes : Admin + Inspecteur + Analyste + Entreprise */}
                 <Route path="/alertes" element={
                   <ProtectedRoute>
-                    <RequireRole allowedRoles={['super_admin', 'directeur_general', 'directeur_adjoint', 'admin_etat', 'directeur_aval', 'directeur_adjoint_aval', 'chef_bureau_aval', 'agent_supervision_aval', 'controleur_distribution', 'inspecteur', 'analyste', 'responsable_entreprise', 'operateur_entreprise', 'personnel_admin', 'directeur_juridique', 'charge_conformite']} />
+                    <RequireRole allowedRoles={['super_admin', 'directeur_general', 'directeur_adjoint', 'admin_etat', 'secretaire_general', 'directeur_aval', 'directeur_adjoint_aval', 'chef_bureau_aval', 'agent_supervision_aval', 'controleur_distribution', 'inspecteur', 'analyste', 'responsable_entreprise', 'responsable_stations', 'gestionnaire_livraisons', 'operateur_entreprise', 'directeur_juridique', 'charge_conformite']} />
                   </ProtectedRoute>
                 }>
                   <Route index element={<Suspense fallback={<PageLoader />}><AlertesPage /></Suspense>} />
@@ -500,11 +520,11 @@ const App = () => (
                     <RequireRole allowedRoles={[
                       'super_admin', 'directeur_general', 'directeur_adjoint', 'admin_etat', 
                       'directeur_aval', 'directeur_adjoint_aval', 'chef_division_distribution', 'chef_bureau_aval', 'agent_supervision_aval', 'controleur_distribution', 'technicien_support_dsa', 'technicien_flux', 'operateur_entreprise',
-                      'inspecteur', 'analyste', 'responsable_entreprise',
-                      'service_it', 'personnel_admin',
+                      'inspecteur', 'analyste', 'responsable_entreprise', 'responsable_stations', 'gestionnaire_livraisons',
+                      'service_it',
                       'directeur_juridique', 'juriste', 'charge_conformite', 'assistant_juridique',
                       'directeur_financier', 'controleur_financier', 'comptable', 
-                      'directeur_importation', 'agent_importation', 'directeur_logistique', 'agent_logistique'
+                      'directeur_importation', 'agent_importation'
                     ]} />
                   </ProtectedRoute>
                 }>
@@ -514,7 +534,7 @@ const App = () => (
                 {/* Intelligence & Analyse (Statistiques et Prévisions) */}
                 <Route path="/statistiques" element={
                   <ProtectedRoute>
-                    <RequireRole allowedRoles={['analyste', 'directeur_general', 'directeur_adjoint', 'super_admin', 'admin_etat']} />
+                    <RequireRole allowedRoles={['analyste', 'directeur_general', 'directeur_adjoint', 'super_admin', 'admin_etat', 'secretaire_general']} />
                   </ProtectedRoute>
                 }>
                   <Route index element={<Suspense fallback={<PageLoader />}><StatistiquesPage /></Suspense>} />
@@ -522,7 +542,7 @@ const App = () => (
 
                 <Route path="/previsions" element={
                   <ProtectedRoute>
-                    <RequireRole allowedRoles={['analyste', 'directeur_general', 'directeur_adjoint', 'super_admin', 'admin_etat']} />
+                    <RequireRole allowedRoles={['analyste', 'directeur_general', 'directeur_adjoint', 'super_admin', 'admin_etat', 'secretaire_general']} />
                   </ProtectedRoute>
                 }>
                   <Route index element={<Suspense fallback={<PageLoader />}><PrevisionsPage /></Suspense>} />
@@ -535,7 +555,7 @@ const App = () => (
                 {/* Utilisateurs : Super Admin + Service IT */}
                 <Route path="/utilisateurs" element={
                   <ProtectedRoute>
-                    <RequireRole allowedRoles={['super_admin', 'directeur_general', 'directeur_adjoint', 'admin_etat', 'directeur_aval', 'directeur_adjoint_aval', 'service_it', 'directeur_financier', 'directeur_juridique', 'directeur_importation', 'directeur_logistique']} />
+                    <RequireRole allowedRoles={['super_admin', 'directeur_general', 'directeur_adjoint', 'admin_etat', 'secretaire_general', 'directeur_aval', 'directeur_adjoint_aval', 'service_it', 'responsable_entreprise', 'directeur_financier', 'directeur_juridique', 'directeur_importation']} />
                   </ProtectedRoute>
                 }>
                   <Route index element={<Suspense fallback={<PageLoader />}><UtilisateursPage /></Suspense>} />
@@ -544,7 +564,7 @@ const App = () => (
                 {/* Commandes : Admin État, DSA, Entreprise, Inspecteur, Analyste */}
                 <Route path="/admin/commandes" element={
                   <ProtectedRoute>
-                    <RequireRole allowedRoles={['directeur_general', 'directeur_adjoint', 'admin_etat', 'super_admin', 'directeur_aval', 'directeur_adjoint_aval', 'chef_division_distribution', 'responsable_entreprise', 'operateur_entreprise', 'inspecteur', 'analyste']} />
+                    <RequireRole allowedRoles={['directeur_general', 'directeur_adjoint', 'admin_etat', 'secretaire_general', 'super_admin', 'directeur_aval', 'directeur_adjoint_aval', 'chef_division_distribution', 'responsable_entreprise', 'gestionnaire_livraisons', 'operateur_entreprise', 'inspecteur', 'analyste']} />
                   </ProtectedRoute>
                 }>
                   <Route index element={<OrdersPage />} />

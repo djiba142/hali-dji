@@ -299,7 +299,8 @@ export default function DashboardEntreprise() {
             filename: `reseau_${entreprise.sigle.toLowerCase()}.xlsx`,
             headers,
             data,
-            signerRole: 'responsable_entreprise'
+            signerRole: currentUserRole || 'responsable_entreprise',
+            signerName: profile?.full_name || entreprise.nom
         });
         toast({ title: "Rapport Excel généré !" });
     } catch (error) {
@@ -310,7 +311,12 @@ export default function DashboardEntreprise() {
 
   return (
     <DashboardLayout 
-      title={currentUserRole === 'responsable_entreprise' ? "Direction Générale — Entreprise Pétrolière" : "Direction Logistique — Coordination des Flux"}
+      title={
+        currentUserRole === 'responsable_entreprise' ? "Direction Générale — Entreprise Pétrolière" : 
+        currentUserRole === 'responsable_stations' ? "Gestion du Réseau & Stations-Service" :
+        currentUserRole === 'gestionnaire_livraisons' ? "Gestionnaire des Livraisons & Flux" :
+        "Direction Logistique — Coordination des Flux"
+      }
       subtitle={entreprise?.nom || "Représentant Officiel SIHG"}
     >
       {/* Profil Header */}
@@ -510,10 +516,10 @@ export default function DashboardEntreprise() {
                         <CardFooter className="px-8 pb-8">
                              <Button className="w-full bg-white text-slate-900 hover:bg-slate-100 rounded-[1.2rem] h-12 font-black uppercase text-[10px] tracking-widest"
                                 onClick={() => {
-                                    if (currentUserRole === 'responsable_entreprise') {
+                                    if (['responsable_entreprise', 'operateur_entreprise', 'gestionnaire_livraisons'].includes(currentUserRole || '')) {
                                         setIsOrdresEtatDialogOpen(true);
                                     } else {
-                                        toast({ title: "Planification", description: "Contactez votre responsable logistique pour planifier un approvisionnement." });
+                                        toast({ title: "Accès Restriction", description: "Seuls la Direction ou le Gestionnaire Livraisons peuvent planifier un approvisionnement." });
                                     }
                                 }}
                              >
@@ -592,7 +598,7 @@ export default function DashboardEntreprise() {
                             <p className="text-[10px] font-black uppercase tracking-[0.2em] mt-2 opacity-60">Citernes prêtes au départ</p>
                         </CardContent>
                     </Card>
-                    {currentUserRole === 'responsable_entreprise' && (
+                    {['responsable_entreprise', 'gestionnaire_livraisons', 'operateur_entreprise'].includes(currentUserRole || '') && (
                         <Card 
                             className="border-none shadow-sm rounded-[2.5rem] overflow-hidden bg-blue-50 text-blue-900 cursor-pointer hover:shadow-lg hover:bg-blue-100 transition-all border border-blue-100 relative group"
                             onClick={() => setIsOrdresEtatDialogOpen(true)}

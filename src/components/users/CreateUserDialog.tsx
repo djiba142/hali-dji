@@ -32,6 +32,7 @@ const ALL_APP_ROLES = [
   'admin_etat',
   'directeur_general',
   'directeur_adjoint',
+  'secretaire_general',
   'directeur_aval',
   'directeur_adjoint_aval',
   'chef_division_distribution',
@@ -42,9 +43,10 @@ const ALL_APP_ROLES = [
   'technicien_flux',
   'inspecteur',
   'analyste',
-  'personnel_admin',
   'service_it',
   'responsable_entreprise',
+  'responsable_stations',
+  'gestionnaire_livraisons',
   'operateur_entreprise',
   'directeur_juridique',
   'juriste',
@@ -55,8 +57,19 @@ const ALL_APP_ROLES = [
   'comptable',
   'directeur_importation',
   'agent_importation',
+  'directeur_administratif',
+  'chef_service_administratif',
+  'agent_administratif',
+  'gestionnaire_documentaire',
   'directeur_logistique',
   'agent_logistique',
+  'responsable_depots',
+  'responsable_transport',
+  'operateur_logistique',
+  'personnel_admin',
+  'responsable_stock',
+  'agent_station',
+  'technicien_aval',
 ] as const;
 
 export const POSTE_ROLES: Record<string, AppRole> = {
@@ -65,10 +78,11 @@ export const POSTE_ROLES: Record<string, AppRole> = {
   'Directeur Financier (DAF)': 'directeur_financier',
   'Directeur Juridique & Conformité': 'directeur_juridique',
   'Directeur Importation / Approvisionnement': 'directeur_importation',
-  'Directeur Logistique SONAP': 'directeur_logistique',
   'Administrateur Central État (Régulation)': 'admin_etat',
   'Directeur Général (DG)': 'directeur_general',
   'Directeur Général Adjoint (DGA)': 'directeur_adjoint',
+  'Directeur Administratif (DA)': 'directeur_administratif',
+  'Directeur Logistique': 'directeur_logistique',
 };
 
 // Organigramme Officiel SONAP / SIHG
@@ -79,22 +93,26 @@ const ORGANISATIONS = [
   { id: 'planification_energetique', label: 'Cellule de Planification Énergétique' },
   { id: 'dsi', label: 'Direction des Systèmes Informatiques (DSI)' },
   { id: 'dsa', label: 'Direction des Services Aval' },
-  { id: 'logistique', label: 'Direction Logistique et Administrative' },
   { id: 'inspecteurs', label: 'Corps National des Inspecteurs' },
   { id: 'juridique', label: 'Direction Juridique & Conformité (DJ/C)' },
+  { id: 'administratif', label: 'Direction Administrative' },
+  { id: 'logistique', label: 'Direction Logistique' },
   { id: 'finance', label: 'Direction Administrative et Financière (DAF)' },
   { id: 'importation', label: 'Direction Importation / Approvisionnement' },
   { id: 'entreprises', label: 'Entreprises Pétrolières Agréées (Siège)' },
+  { id: 'stations', label: 'Stations-Service (Opérations)' },
 
 ];
 
 const POSTES_PAR_ORG: Record<string, { label: string, role: AppRole }[]> = {
   // ─── Administration Centrale ───────────────────────────────
   admin_central: [
-    { label: 'Directeur Général (DG)', role: 'directeur_general' },
-    { label: 'Directeur Général Adjoint (DGA)', role: 'directeur_adjoint' },
-    { label: 'Administrateur Central État (Régulation)', role: 'admin_etat' },
-    { label: 'Chef de Service Régulation Nationale', role: 'admin_etat' },
+    { label: '1. Directeur Général (DG)', role: 'directeur_general' },
+    { label: '2. Directeur Général Adjoint (DGA)', role: 'directeur_adjoint' },
+    { label: '3. Administrateur Central État (Régulation)', role: 'admin_etat' },
+    { label: '4. Secrétaire Général (A.C.)', role: 'secretaire_general' },
+    { label: '5. Analyste Régulation Nationale', role: 'analyste' },
+    { label: '6. Inspecteur Régulation Pétrolière', role: 'inspecteur' },
   ],
   // ─── Cellule d'Analyse Stratégique ──────────────────────────────────────
   analyse: [
@@ -128,18 +146,7 @@ const POSTES_PAR_ORG: Record<string, { label: string, role: AppRole }[]> = {
     { label: 'Agent de Supervision Aval', role: 'agent_supervision_aval' },
     { label: 'Contrôleur de Distribution', role: 'controleur_distribution' },
     { label: 'Technicien Support DSA', role: 'technicien_support_dsa' },
-    { label: 'Technicien Flux Opérationnels', role: 'technicien_flux' },
-  ],
-  // ─── Logistique & Admin ────────────────────────────────────────────────────
-  logistique: [
-    { label: 'Directeur Logistique (Supervision)', role: 'personnel_admin' },
-    { label: 'Agent Administratif (Gestion Documentaire)', role: 'personnel_admin' },
-    { label: 'Gestionnaire des Agréments', role: 'personnel_admin' },
-    { label: 'Archiviste Numérique', role: 'personnel_admin' },
-    { label: 'Directeur Logistique SONAP', role: 'directeur_logistique' },
-    { label: 'Responsable des Dépôts Nationaux', role: 'agent_logistique' },
-    { label: 'Agent de Dispatching', role: 'agent_logistique' },
-    { label: 'Contrôleur des Mouvements de Stock', role: 'agent_logistique' },
+    { label: 'Analyste Approvisionnement', role: 'agent_importation' },
   ],
   // ─── Corps des Inspecteurs ─────────────────────────────────────────────────
   inspecteurs: [
@@ -170,13 +177,35 @@ const POSTES_PAR_ORG: Record<string, { label: string, role: AppRole }[]> = {
     { label: 'Analyste Approvisionnement', role: 'agent_importation' },
   ],
 
+  // ─── Direction Administrative ──────────────────────────────
+  administratif: [
+    { label: 'Directeur Administratif (DA)', role: 'directeur_administratif' },
+    { label: 'Chef de Service Administratif', role: 'chef_service_administratif' },
+    { label: 'Agent Administratif', role: 'agent_administratif' },
+    { label: 'Gestionnaire Documentaire', role: 'gestionnaire_documentaire' },
+    { label: 'Personnel Administratif', role: 'personnel_admin' },
+  ],
+  // ─── Direction Logistique ──────────────────────────────────
+  logistique: [
+    { label: 'Directeur Logistique', role: 'directeur_logistique' },
+    { label: 'Agent Logistique', role: 'agent_logistique' },
+    { label: 'Responsable des Dépôts', role: 'responsable_depots' },
+    { label: 'Responsable Transport', role: 'responsable_transport' },
+    { label: 'Opérateur Logistique Terrain', role: 'operateur_logistique' },
+  ],
   // ─── Entreprises Pétrolières ───────────────────────────────────────────────
   entreprises: [
-    { label: 'Directeur d\'Entreprise Pétrolière', role: 'responsable_entreprise' },
-    { label: 'Responsable Logistique', role: 'operateur_entreprise' },
-    { label: 'Opérateur Citerne / Logistique', role: 'operateur_entreprise' },
+    { label: '1. Directeur d\'Entreprise Pétrolière', role: 'responsable_entreprise' },
+    { label: '2. Responsable Stations-Service', role: 'responsable_stations' },
+    { label: '3. Gestionnaire Livraisons', role: 'gestionnaire_livraisons' },
+    { label: '4. Opérateur Logistique Entreprise', role: 'operateur_entreprise' },
   ],
-
+  // ─── Stations-Service ──────────────────────────────────────────────────────
+  stations: [
+    { label: 'Gérant de Station', role: 'responsable_stations' },
+    { label: 'Responsable Stock Station', role: 'responsable_stock' },
+    { label: 'Agent de Station', role: 'agent_station' },
+  ],
 };
 
 const userSchema = z.object({
@@ -447,7 +476,7 @@ export function CreateUserDialog({ open, onOpenChange, onUserCreated, initialDat
     } catch (error) {
       console.error('Error saving user:', error);
       let errorMessage = error instanceof Error ? error.message : "Impossible d'enregistrer l'utilisateur";
-      
+
       // Handle the Postgres 55P04 error (unsafe enum use)
       if (errorMessage.includes('55P04') || errorMessage.includes('enum app_role')) {
         errorMessage = "Le rôle sélectionné vient d'être créé et n'est pas encore prêt. Veuillez patienter 1 minute ou contacter la DSI pour rafraîchir le schéma.";
@@ -468,69 +497,60 @@ export function CreateUserDialog({ open, onOpenChange, onUserCreated, initialDat
     if (currentUserRole === 'super_admin') {
       // Peut créer : Tout le monde (Autorité suprême)
       return [
-        'super_admin', 'admin_etat', 'directeur_general', 'directeur_adjoint', 
+        'super_admin', 'admin_etat', 'directeur_general', 'directeur_adjoint',
         'directeur_aval', 'directeur_adjoint_aval', 'chef_division_distribution',
         'chef_bureau_aval', 'agent_supervision_aval', 'controleur_distribution',
-        'technicien_support_dsa', 'technicien_flux', 
-        'inspecteur', 'analyste', 'personnel_admin', 'service_it', 'responsable_entreprise', 
+        'technicien_support_dsa', 'technicien_flux',
+        'inspecteur', 'analyste', 'service_it', 'responsable_entreprise',
         'operateur_entreprise',
         'directeur_juridique', 'juriste', 'charge_conformite', 'assistant_juridique',
         'directeur_financier', 'controleur_financier', 'comptable',
-        'directeur_importation', 'agent_importation', 
-        'directeur_logistique', 'agent_logistique'
+        'directeur_importation', 'agent_importation',
+        'directeur_administratif', 'chef_service_administratif', 'agent_administratif', 'gestionnaire_documentaire', 'personnel_admin',
+        'directeur_logistique', 'agent_logistique', 'responsable_depots', 'responsable_transport', 'operateur_logistique',
+        'responsable_stock', 'agent_station', 'technicien_aval'
       ];
     }
-    
-    // 2️⃣ Administrateur central État (Direction Générale SONAP - DG / DGA)
-    if (currentUserRole === 'admin_etat' || currentUserRole === 'directeur_general' || currentUserRole === 'directeur_adjoint') {
-      // Autorité administrative nationale : Peut créer les cadres et les gérants
+
+    // 2️⃣ Administrateur central État (DG / DGA / A.C.)
+    if (['admin_etat', 'directeur_general', 'directeur_adjoint', 'secretaire_general'].includes(currentUserRole || '')) {
       return [
         'directeur_aval', 'directeur_adjoint_aval', 'chef_division_distribution',
         'chef_bureau_aval', 'agent_supervision_aval', 'controleur_distribution',
-        'technicien_support_dsa', 'technicien_flux',
-        'responsable_entreprise', 'operateur_entreprise',
-        'inspecteur', 'analyste', 'personnel_admin',
-        'directeur_financier', 'controleur_financier', 'comptable', 
-        'directeur_importation', 'agent_importation', 
-        'directeur_logistique', 'agent_logistique'
+        'technicien_support_dsa', 'technicien_flux', 'technicien_aval',
+        'responsable_entreprise', 'operateur_entreprise', 'responsable_stations', 'responsable_stock', 'agent_station',
+        'inspecteur', 'analyste',
+        'directeur_financier', 'controleur_financier', 'comptable',
+        'directeur_importation', 'agent_importation',
+        'directeur_administratif', 'chef_service_administratif', 'agent_administratif', 'gestionnaire_documentaire', 'personnel_admin',
+        'directeur_logistique', 'agent_logistique', 'responsable_depots', 'responsable_transport', 'operateur_logistique'
       ];
     }
-    
-    // 3️⃣ Directions Thématiques (DAF, DJ/C, Import, Logistique)
-    if (currentUserRole === 'directeur_juridique') {
-      return ['juriste', 'charge_conformite', 'assistant_juridique'];
-    }
 
-    if (currentUserRole === 'directeur_financier') {
-      return ['controleur_financier', 'comptable'];
-    }
-
-    if (currentUserRole === 'directeur_importation') {
-      return ['agent_importation'];
-    }
-
-    if (currentUserRole === 'directeur_logistique') {
-      return ['agent_logistique'];
-    }
+    // 3️⃣ Directions Thématiques
+    if (currentUserRole === 'directeur_juridique') return ['juriste', 'charge_conformite', 'assistant_juridique'];
+    if (currentUserRole === 'directeur_importation') return ['agent_importation'];
+    if (currentUserRole === 'directeur_administratif') return ['chef_service_administratif', 'agent_administratif', 'gestionnaire_documentaire', 'personnel_admin'];
+    if (currentUserRole === 'directeur_logistique') return ['agent_logistique', 'responsable_depots', 'responsable_transport', 'operateur_logistique'];
+    if (currentUserRole === 'directeur_aval') return ['directeur_adjoint_aval', 'chef_division_distribution', 'chef_bureau_aval', 'agent_supervision_aval', 'controleur_distribution', 'technicien_support_dsa', 'technicien_flux', 'technicien_aval'];
 
     if (currentUserRole === 'service_it') {
-      // La DSI gère la création technique de tous les comptes
       return [
-        'super_admin', 'service_it', 'admin_etat', 'directeur_general', 'directeur_adjoint', 
+        'super_admin', 'service_it', 'admin_etat', 'directeur_general', 'directeur_adjoint',
         'directeur_aval', 'directeur_adjoint_aval', 'chef_division_distribution',
         'chef_bureau_aval', 'agent_supervision_aval', 'controleur_distribution',
-        'technicien_support_dsa', 'technicien_flux',
-        'inspecteur', 'analyste', 'personnel_admin', 'responsable_entreprise', 'operateur_entreprise', 
+        'technicien_support_dsa', 'technicien_flux', 'technicien_aval',
         'directeur_juridique', 'juriste', 'charge_conformite', 'assistant_juridique',
         'directeur_financier', 'controleur_financier', 'comptable',
-        'directeur_importation', 'agent_importation', 
-        'directeur_logistique', 'agent_logistique'
+        'directeur_importation', 'agent_importation',
+        'directeur_administratif', 'chef_service_administratif', 'agent_administratif', 'gestionnaire_documentaire', 'personnel_admin',
+        'directeur_logistique', 'agent_logistique', 'responsable_depots', 'responsable_transport', 'operateur_logistique',
+        'responsable_stock', 'agent_station'
       ];
     }
 
     if (currentUserRole === 'responsable_entreprise') {
-      // Company manager can create operators inside their company
-      return ['responsable_entreprise', 'operateur_entreprise'];
+      return ['responsable_entreprise', 'operateur_entreprise', 'responsable_stations', 'responsable_stock', 'agent_station'];
     }
     return [];
   };
@@ -540,12 +560,12 @@ export function CreateUserDialog({ open, onOpenChange, onUserCreated, initialDat
   // Filter organizations based on current user role
   const allowedOrganisations = ORGANISATIONS.filter(org => {
     if (currentUserRole === 'super_admin' || currentUserRole === 'service_it') return true;
-    
+
     // DSA Supervisor can only see DSA items
     if (currentUserRole === 'directeur_aval' || currentUserRole === 'directeur_adjoint_aval') {
       return ['dsa'].includes(org.id);
     }
-    
+
     // Entreprise Manager can only see Stations and Entreprises (their own)
     if (currentUserRole === 'responsable_entreprise') {
       return ['entreprises', 'stations'].includes(org.id);
@@ -555,6 +575,7 @@ export function CreateUserDialog({ open, onOpenChange, onUserCreated, initialDat
     if (currentUserRole === 'directeur_juridique') return org.id === 'juridique';
     if (currentUserRole === 'directeur_financier') return org.id === 'finance';
     if (currentUserRole === 'directeur_importation') return org.id === 'importation';
+    if (currentUserRole === 'directeur_administratif') return org.id === 'administratif';
     if (currentUserRole === 'directeur_logistique') return org.id === 'logistique';
 
     // Admin Etat / DG can see everything related to business but not system
@@ -569,6 +590,9 @@ export function CreateUserDialog({ open, onOpenChange, onUserCreated, initialDat
   const rolesNeedingEntreprise: AppRole[] = [
     'responsable_entreprise',
     'operateur_entreprise',
+    'responsable_stations',
+    'responsable_stock',
+    'agent_station',
     'agent_supervision_aval',
     'controleur_distribution',
     'chef_bureau_aval',
@@ -617,7 +641,7 @@ export function CreateUserDialog({ open, onOpenChange, onUserCreated, initialDat
               </div>
               <div className="space-y-2">
                 <Label>Date de naissance *</Label>
-                <Input type="date" {...form.register('dateNaissance')} className="rounded-xl border-slate-200" />
+                <Input type="date" {...form.register('dateNaissance')} className="rounded-xl border-slate-200" max={new Date().toISOString().split('T')[0]} />
                 {form.formState.errors.dateNaissance && <p className="text-[10px] text-red-500 font-bold">{form.formState.errors.dateNaissance.message}</p>}
               </div>
               <div className="space-y-2">
@@ -658,8 +682,8 @@ export function CreateUserDialog({ open, onOpenChange, onUserCreated, initialDat
               </div>
               <div className="space-y-2">
                 <Label>Poste *</Label>
-                <Select 
-                  value={form.watch('poste')} 
+                <Select
+                  value={form.watch('poste')}
                   onValueChange={(v) => {
                     form.setValue('poste', v);
                     // Trouvons le rôle associé à ce poste dans l'organisation sélectionnée
@@ -670,7 +694,7 @@ export function CreateUserDialog({ open, onOpenChange, onUserCreated, initialDat
                         form.setValue('role', posteInfo.role);
                       }
                     }
-                  }} 
+                  }}
                   disabled={!form.watch('organisation')}
                 >
                   <SelectTrigger className="rounded-xl border-slate-200"><SelectValue placeholder="Choisir" /></SelectTrigger>
@@ -696,23 +720,24 @@ export function CreateUserDialog({ open, onOpenChange, onUserCreated, initialDat
                   <SelectContent>
                     {/* Niveau National */}
                     <div className="px-2 py-1.5 text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50/50">Niveau National (SIHG / SONAP)</div>
-                    {allowedRoles.filter(r => [
-                      'super_admin', 'directeur_general', 'directeur_adjoint', 'admin_etat', 'service_it', 
-                      'directeur_aval', 'directeur_adjoint_aval', 'chef_division_distribution', 
-                      'chef_bureau_aval', 'agent_supervision_aval', 'controleur_distribution', 
-                      'technicien_support_dsa', 'technicien_flux',
-                      'inspecteur', 'analyste', 'personnel_admin', 
-                      'directeur_juridique', 'juriste', 'charge_conformite', 'assistant_juridique',
-                      'directeur_financier', 'controleur_financier', 'comptable',
-                      'directeur_importation', 'agent_importation', 
-                      'directeur_logistique', 'agent_logistique'
-                    ].includes(r)).map(r => (
-                      <SelectItem key={r} value={r} className="text-xs">{ROLE_LABELS[r]}</SelectItem>
-                    ))}
-                    
+                      {allowedRoles.filter(r => [
+                        'super_admin', 'directeur_general', 'directeur_adjoint', 'admin_etat', 'service_it', 'secretaire_general',
+                        'directeur_aval', 'directeur_adjoint_aval', 'chef_division_distribution',
+                        'chef_bureau_aval', 'agent_supervision_aval', 'controleur_distribution',
+                        'technicien_support_dsa', 'technicien_flux', 'technicien_aval',
+                        'inspecteur', 'analyste', 
+                        'directeur_juridique', 'juriste', 'charge_conformite', 'assistant_juridique',
+                        'directeur_financier', 'controleur_financier', 'comptable',
+                        'directeur_importation', 'agent_importation',
+                        'directeur_administratif', 'chef_service_administratif', 'agent_administratif', 'gestionnaire_documentaire', 'personnel_admin',
+                        'directeur_logistique', 'agent_logistique', 'responsable_depots', 'responsable_transport', 'operateur_logistique'
+                      ].includes(r)).map(r => (
+                        <SelectItem key={r} value={r} className="text-xs">{ROLE_LABELS[r]}</SelectItem>
+                      ))}
+
                     {/* Niveau Entreprise */}
                     <div className="px-2 py-1.5 text-[10px] font-black text-blue-400 uppercase tracking-widest bg-blue-50/10 mt-2">Niveau Entreprise Pétrolière</div>
-                    {allowedRoles.filter(r => ['responsable_entreprise', 'operateur_entreprise'].includes(r)).map(r => (
+                    {allowedRoles.filter(r => ['responsable_entreprise', 'operateur_entreprise', 'responsable_stations', 'responsable_stock', 'agent_station'].includes(r)).map(r => (
                       <SelectItem key={r} value={r} className="text-xs">{ROLE_LABELS[r]}</SelectItem>
                     ))}
 
@@ -746,20 +771,20 @@ export function CreateUserDialog({ open, onOpenChange, onUserCreated, initialDat
               {/* Entreprise & Station (Dynamique) */}
               {rolesNeedingEntreprise.includes(selectedRole as AppRole) && (
                 <div className="col-span-2 space-y-4 pt-2">
-                    <div className="space-y-2">
-                        <Label>Entreprise Pétrolière Rattachée *</Label>
-                        <Select 
-                            value={form.watch('entrepriseId')} 
-                            onValueChange={(v) => { form.setValue('entrepriseId', v); form.setValue('stationId', ''); }}
-                            disabled={currentUserRole === 'responsable_entreprise'}
-                        >
-                            <SelectTrigger className="rounded-xl border-primary/30 bg-primary/5"><SelectValue placeholder="Choisir l'entreprise" /></SelectTrigger>
-                            <SelectContent>
-                                {entreprises.map(e => <SelectItem key={e.id} value={e.id}>{e.nom}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                        {form.formState.errors.entrepriseId && <p className="text-[10px] text-red-500 font-bold">{form.formState.errors.entrepriseId.message}</p>}
-                    </div>
+                  <div className="space-y-2">
+                    <Label>Entreprise Pétrolière Rattachée *</Label>
+                    <Select
+                      value={form.watch('entrepriseId')}
+                      onValueChange={(v) => { form.setValue('entrepriseId', v); form.setValue('stationId', ''); }}
+                      disabled={currentUserRole === 'responsable_entreprise'}
+                    >
+                      <SelectTrigger className="rounded-xl border-primary/30 bg-primary/5"><SelectValue placeholder="Choisir l'entreprise" /></SelectTrigger>
+                      <SelectContent>
+                        {entreprises.map(e => <SelectItem key={e.id} value={e.id}>{e.nom}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    {form.formState.errors.entrepriseId && <p className="text-[10px] text-red-500 font-bold">{form.formState.errors.entrepriseId.message}</p>}
+                  </div>
 
 
                 </div>
@@ -807,9 +832,9 @@ export function CreateUserDialog({ open, onOpenChange, onUserCreated, initialDat
                 )}
               </div>
               <div className="flex items-center space-x-3 p-4 bg-amber-50 rounded-2xl border border-amber-100">
-                <input 
-                  type="checkbox" 
-                  id="forcePasswordChange" 
+                <input
+                  type="checkbox"
+                  id="forcePasswordChange"
                   className="w-5 h-5 rounded-lg border-amber-300 text-amber-600 focus:ring-amber-500"
                   checked={form.watch('forcePasswordChange')}
                   onChange={(e) => form.setValue('forcePasswordChange', e.target.checked)}

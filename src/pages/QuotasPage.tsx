@@ -201,7 +201,8 @@ export default function QuotasPage() {
         filename: `Quotas_SIHG_${currentMois}_${currentAnnee}`,
         headers,
         data,
-        signerRole: currentUserRole || 'admin_etat'
+        signerRole: currentUserRole || 'admin_etat',
+        signerName: profile?.full_name || 'Autorité de Régulation'
       });
       toast({ title: "Succès", description: "Fichier Excel généré avec logos et certifications." });
     } catch (err: any) {

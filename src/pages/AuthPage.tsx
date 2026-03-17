@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useSearchParams } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 import logo from '@/assets/logo.png';
 import sonapLogo from '@/assets/sonap.jpeg';
 import authBg from '@/assets/auth-bg.png';
@@ -19,11 +20,21 @@ const loginSchema = z.object({
 
 export default function AuthPage() {
   const navigate = useNavigate();
-  const { signIn, resetPasswordForEmail, updatePassword, user, hasProfile, hasRole, loading: authLoading } = useAuth();
+  const { 
+    signIn, 
+    resetPasswordForEmail, 
+    updatePassword, 
+    user, 
+    hasProfile, 
+    hasRole, 
+    loading: authLoading,
+    getDashboardRoute 
+  } = useAuth();
   const { toast } = useToast();
 
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [dataCheckReady, setDataCheckReady] = useState(false);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -37,18 +48,24 @@ export default function AuthPage() {
   const [searchParams] = useSearchParams();
   const reason = searchParams.get('reason');
 
+  const getEffectiveRedirect = () => {
+    const savedRedirect = sessionStorage.getItem('redirectAfterLogin');
+    if (savedRedirect) {
+      sessionStorage.removeItem('redirectAfterLogin');
+      return savedRedirect;
+    }
+    return getDashboardRoute();
+  };
+
   useEffect(() => {
-    // Si l'utilisateur est connecté ET que la vérification du profil est terminée
-    if (user && !authLoading && view !== 'reset') {
+    // Redirection automatique si déjà connecté
+    if (user && !authLoading && view === 'login') {
       if (hasProfile && hasRole) {
-        // Check for saved redirect path
-        const savedRedirect = sessionStorage.getItem('redirectAfterLogin');
-        if (savedRedirect) {
-          sessionStorage.removeItem('redirectAfterLogin');
-          navigate(savedRedirect);
-        } else {
-          navigate('/panel');
-        }
+        const route = getEffectiveRedirect();
+        console.log('Utilisateur authentifié, redirection vers:', route);
+        navigate(route);
+      } else {
+        console.log('Utilisateur connecté mais sans profil/rôle complet.');
       }
     }
   }, [user, hasProfile, hasRole, authLoading, navigate, view]);
@@ -72,34 +89,39 @@ export default function AuthPage() {
         return;
       }
 
-      const { error } = await signIn(email, password);
+      console.log('Tentative de connexion pour:', email.trim());
+      
+      const { error } = await signIn(email.trim(), password);
+
       if (error) {
-        if (error.message.includes('Invalid login credentials')) {
+        console.error('Erreur Supabase Auth:', error);
+        
+        // Error categories
+        if (error.message.includes('Invalid login credentials') || error.message.includes('Email not confirmed')) {
           toast({
-            title: 'Erreur de connexion',
-            description: 'Email ou mot de passe incorrect',
-            variant: 'destructive',
+            variant: "destructive",
+            title: "Identifiants Invalides",
+            description: "Email ou mot de passe incorrect. (Détails: " + error.message + ")",
           });
-        } else if (error.message.includes('Email not confirmed')) {
+        } else if (error.message.includes('Database error') || error.message.includes('fetch') || error.message.includes('Network Error')) {
           toast({
-            title: 'Email non confirmé',
-            description: 'Veuillez vérifier votre email pour confirmer votre compte',
-            variant: 'destructive',
+            variant: "destructive",
+            title: "Serveur Indisponible",
+            description: "Le backend SIHG ne répond pas. Vérifiez votre connexion. (Erreur: " + error.message + ")",
           });
         } else {
           toast({
-            title: 'Erreur',
+            title: 'Erreur Technique',
             description: error.message,
             variant: 'destructive',
           });
         }
       }
-      // Note: Le succès est géré par la redirection automatique dans useEffect
-      // car fetchUserData mettra à jour hasProfile/hasRole
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Exception lors de handleSubmit:', error);
       toast({
         title: 'Erreur',
-        description: 'Une erreur inattendue est survenue',
+        description: error.message || 'Une erreur inattendue est survenue',
         variant: 'destructive',
       });
     } finally {
@@ -107,11 +129,40 @@ export default function AuthPage() {
     }
   };
 
-  // Only show "unauthorized" AFTER auth is fully loaded (prevents flash during login redirect)
-  const isUnauthorized = user && !authLoading && (!hasProfile || !hasRole);
+  // Only show "unauthorized" AFTER auth is fully loaded AND a grace period has passed
+  // This prevents race conditions where profile/role aren't loaded yet
+  const isUnauthorized = user && !authLoading && dataCheckReady && (!hasProfile || !hasRole);
 
-  // If user is logged in and we are still loading OR about to redirect, show a spinner
-  // This prevents any UI flashes (unauthorized card or login form)
+  // After auth finishes loading, wait a grace period before checking unauthorized status
+  // This gives fetchUserData enough time to complete
+  useEffect(() => {
+    if (user && !authLoading && (!hasProfile || !hasRole)) {
+      const timer = setTimeout(() => {
+        setDataCheckReady(true);
+      }, 3000); // 3 second grace period
+      return () => clearTimeout(timer);
+    } else {
+      setDataCheckReady(false);
+    }
+  }, [user, authLoading, hasProfile, hasRole]);
+
+  // Auto sign-out users not in the database - no "accès restreint" page shown
+  useEffect(() => {
+    if (isUnauthorized) {
+      const handleUnauthorized = async () => {
+        const unauthorizedEmail = user?.email;
+        console.error(`Accès refusé pour ${unauthorizedEmail}: profil=${hasProfile}, rôle=${hasRole}`);
+        await supabase.auth.signOut();
+        toast({
+          title: 'Accès refusé',
+          description: `Le compte "${unauthorizedEmail}" n'est pas autorisé. Vérifiez que le profil et le rôle existent dans la base de données.`,
+          variant: 'destructive',
+        });
+      };
+      handleUnauthorized();
+    }
+  }, [isUnauthorized, user, hasProfile, hasRole, toast]);
+
   if (user && (authLoading || (hasProfile && hasRole && view !== 'reset'))) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -163,32 +214,6 @@ export default function AuthPage() {
               </div>
             )}
           </div>
-
-          {isUnauthorized && (
-            <div className="animate-in fade-in slide-in-from-top-4 duration-500">
-              <div className="p-4 rounded-xl border border-red-200 bg-red-50 text-red-900 space-y-3 shadow-sm">
-                <div className="flex items-center gap-2 font-bold text-red-700">
-                  <ShieldAlert className="h-5 w-5" />
-                  Accès restreint
-                </div>
-                <p className="text-sm leading-relaxed">
-                  Votre compte Google/Email est bien authentifié, mais il n'est pas encore enregistré dans la base de données officielle du SIHG.
-                </p>
-                <div className="text-xs space-y-1 opacity-80 border-t border-red-200 pt-2">
-                  <p>• Contactez votre administrateur pour obtenir un rôle.</p>
-                  <p>• Email détecté : <span className="font-mono">{user?.email}</span></p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full mt-2 border-red-200 hover:bg-red-100 hover:text-red-900"
-                  asChild
-                >
-                  <Link to="/">Quitter</Link>
-                </Button>
-              </div>
-            </div>
-          )}
 
           {!isUnauthorized && !isSuccess ? (
             <>

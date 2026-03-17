@@ -74,8 +74,8 @@ export default function DashboardLogistique() {
 
   return (
     <DashboardLayout 
-      title="Direction Logistique & Dépôts" 
-      subtitle="Gestion des stocks stratégiques, optimisation du stockage et supervision des réceptions."
+      title="Direction Logistique" 
+      subtitle="Supervision du transport national, gestion des dépôts pétroliers et des stocks stratégiques."
     >
       <div className="space-y-8">
         {/* Stats Grid */}
@@ -206,12 +206,12 @@ export default function DashboardLogistique() {
                        <p className="text-xs text-slate-500 font-medium">{item.carburant || 'Produit'} — {item.quantite_prevue || '0'} T</p>
                        
                        <div className="flex gap-2">
-                         {item.statut === 'en_transit' && (role === 'agent_logistique' || role === 'super_admin') && (
+                         {item.statut === 'en_transit' && (['responsable_depots', 'operateur_logistique', 'agent_logistique', 'super_admin'].includes(role || '')) && (
                             <Button size="sm" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black text-[9px] uppercase" onClick={() => handleConfirmArrival(item.id)}>
                               Confirmer Arrivée Port
                             </Button>
                          )}
-                         {item.statut === 'arrive_conakry' && (role === 'agent_logistique' || role === 'super_admin') && (
+                         {item.statut === 'arrive_conakry' && (['responsable_depots', 'operateur_logistique', 'agent_logistique', 'super_admin'].includes(role || '')) && (
                             <Button size="sm" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[9px] uppercase" onClick={() => handleFinalReception(item.id)}>
                               Effectuer Réception & Dépôt
                             </Button>
@@ -243,7 +243,7 @@ export default function DashboardLogistique() {
                 <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-500">Actions Logistiques</CardTitle>
               </CardHeader>
               <CardContent className="grid grid-cols-1 gap-2">
-                {role === 'agent_logistique' || role === 'super_admin' ? (
+                {['responsable_depots', 'responsable_transport', 'operateur_logistique', 'agent_logistique', 'super_admin'].includes(role || '') ? (
                   <div className="space-y-2">
                     <ActionButton 
                       icon={Plus} 
@@ -266,7 +266,7 @@ export default function DashboardLogistique() {
                     <div className="p-4 rounded-2xl bg-slate-900 text-white shadow-xl">
                       <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Perspective Managériale</p>
                       <p className="text-xs leading-relaxed italic opacity-80">
-                        En tant que Directeur, vous avez une vue globale sur les opérations sans saisie de données. Les agents logistiques sont responsables de l'intégrité des flux.
+                        En tant que Directeur, vous avez une vue globale sur les opérations sans saisie de données. Les responsables et opérateurs sont garants de l'intégrité des flux.
                       </p>
                     </div>
                     <Button variant="outline" className="w-full justify-start gap-3 h-11 rounded-xl border-slate-200" onClick={() => navigate('/rapports')}>

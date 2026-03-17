@@ -75,7 +75,6 @@ const ORG_LABELS: Record<string, string> = {
   inspecteurs: 'Inspecteurs SONAP',
   finance: 'Direction Administrative et Financière (DAF)',
   importation: 'Direction Importation / Approvisionnement',
-  logistique: 'Direction Logistique et Administrative',
   juridique: 'Direction Juridique & Conformité (DJ/C)',
   entreprises: 'Siège Entreprise',
 };
@@ -95,9 +94,11 @@ const roleTheme: Record<AppRole, { color: string; bg: string; border: string; ic
   technicien_flux: { color: 'text-emerald-500', bg: 'bg-emerald-50/30', border: 'border-emerald-100/50', iconColor: 'text-emerald-400' },
   inspecteur: { color: 'text-lime-700', bg: 'bg-lime-50', border: 'border-lime-200', iconColor: 'text-lime-600' },
   analyste: { color: 'text-cyan-700', bg: 'bg-cyan-50', border: 'border-cyan-200', iconColor: 'text-cyan-600' },
-  personnel_admin: { color: 'text-slate-700', bg: 'bg-slate-50', border: 'border-slate-200', iconColor: 'text-slate-600' },
   service_it: { color: 'text-purple-700', bg: 'bg-purple-50', border: 'border-purple-200', iconColor: 'text-purple-600' },
   responsable_entreprise: { color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200', iconColor: 'text-amber-600' },
+  secretaire_general: { color: 'text-blue-800', bg: 'bg-blue-100', border: 'border-blue-300', iconColor: 'text-blue-700' },
+  responsable_stations: { color: 'text-amber-700', bg: 'bg-amber-100', border: 'border-amber-300', iconColor: 'text-amber-600' },
+  gestionnaire_livraisons: { color: 'text-orange-700', bg: 'bg-orange-50', border: 'border-orange-200', iconColor: 'text-orange-600' },
   operateur_entreprise: { color: 'text-amber-600', bg: 'bg-amber-50/50', border: 'border-amber-100', iconColor: 'text-amber-500' },
   directeur_juridique: { color: 'text-indigo-900', bg: 'bg-indigo-50', border: 'border-indigo-300', iconColor: 'text-indigo-800' },
   juriste: { color: 'text-indigo-700', bg: 'bg-indigo-50/50', border: 'border-indigo-100', iconColor: 'text-indigo-600' },
@@ -108,9 +109,9 @@ const roleTheme: Record<AppRole, { color: string; bg: string; border: string; ic
   comptable: { color: 'text-blue-600', bg: 'bg-blue-50/30', border: 'border-blue-100/50', iconColor: 'text-blue-500' },
   directeur_importation: { color: 'text-indigo-900', bg: 'bg-indigo-50', border: 'border-indigo-300', iconColor: 'text-indigo-800' },
   agent_importation: { color: 'text-indigo-700', bg: 'bg-indigo-50/50', border: 'border-indigo-100', iconColor: 'text-indigo-600' },
-  directeur_logistique: { color: 'text-emerald-900', bg: 'bg-emerald-50', border: 'border-emerald-300', iconColor: 'text-emerald-800' },
-  agent_logistique: { color: 'text-emerald-700', bg: 'bg-emerald-50/50', border: 'border-emerald-100', iconColor: 'text-emerald-600' },
 };
+
+const DEFAULT_THEME = { color: 'text-slate-700', bg: 'bg-slate-50', border: 'border-slate-200', iconColor: 'text-slate-600' };
 
 export default function UtilisateursPage() {
   const { role: currentUserRole, profile: currentUserProfile, deleteUser } = useAuth();
@@ -201,10 +202,6 @@ export default function UtilisateursPage() {
       // L'Import voit son pôle
       const impRoles: AppRole[] = ['directeur_importation', 'agent_importation'];
       if (user.role && !impRoles.includes(user.role)) return false;
-    } else if (currentUserRole === 'directeur_logistique') {
-      // La Logistique voit son pôle
-      const logRoles: AppRole[] = ['directeur_logistique', 'agent_logistique'];
-      if (user.role && !logRoles.includes(user.role)) return false;
     }
 
     const matchesSearch =
@@ -230,8 +227,7 @@ export default function UtilisateursPage() {
     currentUserRole === 'service_it' ||
     currentUserRole === 'directeur_financier' ||
     currentUserRole === 'directeur_juridique' ||
-    currentUserRole === 'directeur_importation' ||
-    currentUserRole === 'directeur_logistique';
+    currentUserRole === 'directeur_importation';
 
   const handleEdit = (user: UserWithDetails) => {
     setUserToEdit(user);
@@ -331,8 +327,8 @@ export default function UtilisateursPage() {
                   </div>
                   <Badge variant="outline" className="text-[10px] border-blue-200 text-blue-700 bg-blue-50/50">SONAP</Badge>
                 </div>
-                <p className="text-2xl font-black">{(usersByRole['directeur_general'] || 0) + (usersByRole['directeur_adjoint'] || 0) + (usersByRole['admin_etat'] || 0) + (usersByRole['directeur_juridique'] || 0)}</p>
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-tight">Top Management & DJ/C</p>
+                <p className="text-2xl font-black">{(usersByRole['directeur_general'] || 0) + (usersByRole['directeur_adjoint'] || 0) + (usersByRole['admin_etat'] || 0) + (usersByRole['directeur_juridique'] || 0) + (usersByRole['directeur_financier'] || 0) + (usersByRole['directeur_importation'] || 0)}</p>
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-tight">Management & Directions</p>
               </CardContent>
             </Card>
             
@@ -400,7 +396,7 @@ export default function UtilisateursPage() {
             ))
           ) : (
             filteredUsers.map(user => {
-              const theme = (user.role && roleTheme[user.role]) ? roleTheme[user.role] : roleTheme['personnel_admin'];
+              const theme = (user.role && roleTheme[user.role]) ? roleTheme[user.role] : DEFAULT_THEME;
               return (
                 <Card 
                   key={user.id} 
@@ -561,7 +557,7 @@ export default function UtilisateursPage() {
           <CardContent className="p-8">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {(Object.keys(ROLE_LABELS) as AppRole[]).map((role, index) => {
-                const theme = roleTheme[role];
+                const theme = roleTheme[role] || DEFAULT_THEME;
                 return (
                   <div key={role} className="flex gap-4 group hover:bg-slate-50 dark:hover:bg-slate-800/20 p-3 rounded-2xl transition-all">
                     <div className="flex flex-col items-center flex-shrink-0">

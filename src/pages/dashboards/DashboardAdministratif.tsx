@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     FileText, Building2, CheckCircle2, Clock, Search,
     RefreshCw, FolderOpen, ClipboardCheck, AlertCircle, Eye,
@@ -27,7 +28,7 @@ import {
     DialogFooter,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth, AppRole } from '@/contexts/AuthContext';
 import { generateCustomReportPDF } from '@/lib/pdfExport';
 import { generateExcelReport } from '@/lib/excelExport';
 
@@ -55,8 +56,17 @@ interface Gestionnaire {
     station_nom?: string;
 }
 
-export default function DashboardPersonnelAdmin() {
+export default function DashboardAdministratif() {
+    const { role, profile } = useAuth();
+    const navigate = useNavigate();
+    
     const handleAdminValidate = async (station: any) => {
+        const adminRoles: AppRole[] = ['directeur_administratif', 'chef_service_administratif', 'super_admin'];
+        if (!adminRoles.includes(role as AppRole)) {
+            toast.error("Votre rôle ne permet pas la validation des dossiers administratifs.");
+            return;
+        }
+
         try {
             const { error } = await supabase
                 .from('stations')
@@ -66,13 +76,14 @@ export default function DashboardPersonnelAdmin() {
             if (error) throw error;
             
             await notifyStationStatusUpdate(station, 'attente_djc');
-            toast.success(`Validation DLA effectuée pour ${station.nom}`);
+            toast.success(`Validation Administrative effectuée pour ${station.nom}`);
             fetchData();
         } catch (err: any) {
             console.error(err);
             toast.error("Erreur lors de la validation administrative.");
         }
     };
+
     const [entreprises, setEntreprises] = useState<EntrepriseDoc[]>([]);
     const [gestionnaires, setGestionnaires] = useState<Gestionnaire[]>([]);
     const [allStations, setAllStations] = useState<any[]>([]);
@@ -113,7 +124,7 @@ export default function DashboardPersonnelAdmin() {
             setGestionnaires(formattedGest);
 
             // Fetch all stations for the new tab
-            const { data: stationsData } = await supabase
+            const { data: stationsData } = await (supabase as any)
                 .from('stations')
                 .select('*, entreprise:entreprises(nom)')
                 .order('nom');
@@ -174,7 +185,8 @@ export default function DashboardPersonnelAdmin() {
                         region: e.region
                     }))
                 },
-                signerRole: 'personnel_admin'
+                signerRole: role || 'directeur_administratif',
+                signerName: profile?.full_name || 'Direction Administrative'
             });
         } catch (error) {
             console.error('PDF Export Error:', error);
@@ -199,7 +211,8 @@ export default function DashboardPersonnelAdmin() {
                 filename: 'entreprises_sihg.xlsx',
                 headers,
                 data,
-                signerRole: 'personnel_admin'
+                signerRole: role || 'directeur_administratif',
+                signerName: profile?.full_name || 'Direction Administrative'
             });
         } catch (error) {
             console.error('Excel Export Error:', error);
@@ -208,8 +221,8 @@ export default function DashboardPersonnelAdmin() {
 
     return (
         <DashboardLayout
-            title="Personnel Administratif — Direction Logistique et Administration"
-            subtitle="Gestion documentaire, dossiers réglementaires et conformité du secteur pétrolier"
+            title="Direction Administrative"
+            subtitle="Gérer les aspects administratifs et réglementaires du secteur pétrolier"
         >
             <div className="flex items-center gap-1.5 mb-6">
                 <span className="h-2 w-4 bg-[#CE1126] rounded-sm" />
@@ -223,16 +236,16 @@ export default function DashboardPersonnelAdmin() {
                     <Shield className="h-4 w-4 text-blue-600" />
                 </div>
                 <div>
-                    <p className="text-xs font-bold text-blue-800 uppercase italic tracking-tight">Autorité de Gestion Documentaire & Conformité Administative</p>
-                    <p className="text-[10px] text-blue-600 mt-0.5">Accès restreint : Archivage, suivi des agréments et visualisation du patrimoine technique. Modification des opérations et accès financier non autorisés.</p>
+                    <p className="text-xs font-bold text-blue-800 uppercase italic tracking-tight">Autorité de Gestion Administrative & Réglementaire</p>
+                    <p className="text-[10px] text-blue-600 mt-0.5">Accès : Entreprises, Agréments, Licences et Documents Réglementaires. Cette direction ne gère pas la logistique ni les stocks.</p>
                 </div>
             </div>
 
             {/* KPI Summary */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
                 <StatCard title="Entreprises Pétrolières" value={entreprises.length} subtitle={`${entreprises.filter(e => e.statut === 'actif').length} dossiers actifs`} icon={Building2} />
-                <StatCard title="Patrimoine Stations" value={allStations.length} subtitle="Installations vérifiées" icon={Fuel} variant="primary" />
-                <StatCard title="Dossiers Documents" value={411} subtitle="Titres & Actes enregistrés" icon={FileText} />
+                <StatCard title="Agréments & Licences" value={allStations.length} subtitle="Titres en cours de validité" icon={Briefcase} variant="primary" />
+                <StatCard title="Documents Archivés" value={411} subtitle="Registres numériques" icon={FileText} />
             </div>
 
             <Tabs defaultValue="dossiers" value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -244,30 +257,40 @@ export default function DashboardPersonnelAdmin() {
                         </TabsTrigger>
                         <TabsTrigger value="validation" className="gap-2 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm text-xs flex gap-2">
                             <ClipboardCheck className="h-4 w-4" />
-                            Dossiers (DLA)
+                            Validation (DA)
                             <Badge variant="outline" className="bg-amber-100/50 text-amber-700 border-amber-200 text-[10px] px-1 h-4">
-                                {allStations.filter(s => s.statut === 'attente_dla').length}
+                                {allStations.filter(s => s.statut === 'attente_da').length}
                             </Badge>
+                        </TabsTrigger>
+                        <TabsTrigger 
+                            value="workflow" 
+                            className="gap-2 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm text-xs"
+                            onClick={() => navigate('/administratif/dossiers')}
+                        >
+                            <FolderOpen className="h-4 w-4 text-primary" />
+                            Workflow Dossiers
                         </TabsTrigger>
                         <TabsTrigger value="gestionnaires" className="gap-2 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm text-xs">
                             <Users className="h-4 w-4" />
                             Responsables
                         </TabsTrigger>
-                        <TabsTrigger value="stations" className="gap-2 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm text-xs">
-                            <MapPin className="h-4 w-4" />
-                            Installations
+                        <TabsTrigger value="documents" className="gap-2 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm text-xs">
+                            <FileText className="h-4 w-4" />
+                            Documents
                         </TabsTrigger>
                         <TabsTrigger value="suivi" className="gap-2 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm text-xs">
                             <Activity className="h-4 w-4" />
-                            Suivi Administratif
-                        </TabsTrigger>
-                        <TabsTrigger value="documents" className="gap-2 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm text-xs">
-                            <FileText className="h-4 w-4" />
-                            Référentiel Documents
+                            Historique
                         </TabsTrigger>
                     </TabsList>
 
                     <div className="flex items-center gap-2">
+                        {['agent_administratif', 'chef_service_administratif', 'directeur_administratif', 'super_admin'].includes(role || '') && (
+                            <Button size="sm" className="gap-2 bg-slate-900 text-white font-bold h-9" onClick={() => navigate('/entreprises')}>
+                                <Plus className="h-4 w-4" />
+                                Nouvelle Entreprise
+                            </Button>
+                        )}
                         <Button variant="outline" size="sm" onClick={handleExportExcel} className="h-9 gap-2 font-bold border-slate-200">
                             <Download className="h-3.5 w-3.5 text-emerald-600" />
                             Excel
@@ -282,15 +305,15 @@ export default function DashboardPersonnelAdmin() {
                     </div>
                 </div>
 
-                {/* TAB: Validation DLA */}
+                {/* TAB: Validation DA */}
                 <TabsContent value="validation" className="space-y-4">
                     <Card className="border-none shadow-sm overflow-hidden">
                         <CardHeader className="bg-amber-50/50">
                             <CardTitle className="text-lg flex items-center gap-2">
                                 <ClipboardCheck className="h-5 w-5 text-amber-600" />
-                                Dossiers en attente de validation administrative
+                                Dossiers en attente de validation administrative (DA)
                             </CardTitle>
-                            <CardDescription>Étape 2 : Vérification du dossier DLA après validation technique DSA</CardDescription>
+                            <CardDescription>Étape de vérification administrative après validation technique DSA</CardDescription>
                         </CardHeader>
                         <CardContent className="p-0">
                             <div className="overflow-x-auto">
@@ -304,12 +327,12 @@ export default function DashboardPersonnelAdmin() {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y">
-                                        {allStations.filter(s => s.statut === 'attente_dla').length === 0 ? (
+                                        {allStations.filter(s => s.statut === 'attente_da').length === 0 ? (
                                             <tr>
-                                                <td colSpan={4} className="py-20 text-center text-muted-foreground italic">Aucun dossier en attente (DLA)</td>
+                                                <td colSpan={4} className="py-20 text-center text-muted-foreground italic">Aucun dossier en attente (DA)</td>
                                             </tr>
                                         ) : (
-                                            allStations.filter(s => s.statut === 'attente_dla').map(s => (
+                                            allStations.filter(s => s.statut === 'attente_da').map(s => (
                                                 <tr key={s.id} className="hover:bg-slate-50 transition-colors">
                                                     <td className="py-4 px-6 font-bold">{s.nom}</td>
                                                     <td className="py-4 px-4">{s.region} / {s.ville}</td>
@@ -319,7 +342,7 @@ export default function DashboardPersonnelAdmin() {
                                                             onClick={() => handleAdminValidate(s)}
                                                             className="h-8 bg-indigo-600 hover:bg-slate-900 text-white font-black uppercase text-[10px] tracking-widest shadow-lg shadow-indigo-600/20"
                                                         >
-                                                            Valider Admin (DLA)
+                                                            Valider Admin (DA)
                                                         </Button>
                                                     </td>
                                                 </tr>
@@ -337,7 +360,7 @@ export default function DashboardPersonnelAdmin() {
                     <Card className="border-none shadow-sm">
                         <CardHeader>
                             <CardTitle className="text-lg">Responsables & Gestionnaires Référencés</CardTitle>
-                            <CardDescription>Annuaire des contacts opérationnels par entreprise et station</CardDescription>
+                            <CardDescription>Annuaire des contacts opérationnels par entreprise</CardDescription>
                         </CardHeader>
                         <CardContent className="p-0">
                             <div className="overflow-x-auto">
@@ -345,7 +368,7 @@ export default function DashboardPersonnelAdmin() {
                                     <thead>
                                         <tr className="border-b bg-muted/20">
                                             <th className="text-left py-4 px-6 font-semibold uppercase tracking-wider text-[10px] text-muted-foreground">Nom Complet</th>
-                                            <th className="text-left py-4 px-4 font-semibold uppercase tracking-wider text-[10px] text-muted-foreground">Organisation rattachée</th>
+                                            <th className="text-left py-4 px-4 font-semibold uppercase tracking-wider text-[10px] text-muted-foreground">Organisation</th>
                                             <th className="text-left py-4 px-4 font-semibold uppercase tracking-wider text-[10px] text-muted-foreground">Installation</th>
                                             <th className="text-left py-4 px-4 font-semibold uppercase tracking-wider text-[10px] text-muted-foreground">Contacts officiels</th>
                                         </tr>
@@ -386,61 +409,14 @@ export default function DashboardPersonnelAdmin() {
                     </Card>
                 </TabsContent>
 
-                {/* TAB: Stations */}
-                <TabsContent value="stations" className="space-y-4">
-                    <Card className="border-none shadow-sm">
-                        <CardHeader>
-                            <CardTitle className="text-lg">Cadastre National des Installations</CardTitle>
-                            <CardDescription>Vérification de la structure technique des points de vente</CardDescription>
-                        </CardHeader>
-                        <CardContent className="p-0">
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="border-b bg-muted/20">
-                                            <th className="text-left py-4 px-6 font-semibold uppercase tracking-wider text-[10px] text-muted-foreground">Désignation</th>
-                                            <th className="text-left py-4 px-4 font-semibold uppercase tracking-wider text-[10px] text-muted-foreground">Entreprise</th>
-                                            <th className="text-left py-4 px-4 font-semibold uppercase tracking-wider text-[10px] text-muted-foreground">Zone</th>
-                                            <th className="text-center py-4 px-4 font-semibold uppercase tracking-wider text-[10px] text-muted-foreground">Pompes</th>
-                                            <th className="text-right py-4 px-6 font-semibold uppercase tracking-wider text-[10px] text-muted-foreground">Statut d'exploitation</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y">
-                                        {allStations.map(s => (
-                                            <tr key={s.id} className="hover:bg-slate-50/50 transition-colors">
-                                                <td className="py-4 px-6">
-                                                    <div className="font-bold text-slate-900">{s.nom}</div>
-                                                    <div className="text-[9px] font-mono text-muted-foreground">CODE: {s.code}</div>
-                                                </td>
-                                                <td className="py-4 px-4 text-xs font-bold text-primary">{s.entreprise?.nom || '-'}</td>
-                                                <td className="py-4 px-4 text-xs text-muted-foreground">{s.ville} ({s.region})</td>
-                                                <td className="py-4 px-4 text-center font-mono">
-                                                    {s.nombre_pompes || 2}
-                                                </td>
-                                                <td className="py-4 px-6 text-right">
-                                                    <Badge className={cn("text-[9px] font-black uppercase tracking-widest",
-                                                        s.statut === 'ouverte' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'
-                                                    )} variant="outline">
-                                                        {s.statut}
-                                                    </Badge>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-
                 {/* TAB: Dossiers Entreprises */}
                 <TabsContent value="dossiers" className="space-y-4">
                     <Card className="border-none shadow-sm overflow-hidden">
                         <CardHeader className="bg-slate-50/50 pb-4">
                             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                                 <div>
-                                    <CardTitle className="text-lg">Archivage des Entreprises</CardTitle>
-                                    <CardDescription>Consultation et vérification administrative des entreprises opérant en Guinée</CardDescription>
+                                    <CardTitle className="text-lg">Registre des Entreprises Pétrolières</CardTitle>
+                                    <CardDescription>Consultation et vérification administrative des opérateurs</CardDescription>
                                 </div>
                                 <div className="relative w-full md:w-[350px]">
                                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -503,7 +479,7 @@ export default function DashboardPersonnelAdmin() {
                                                 <td className="py-4 px-6 text-right">
                                                     <Button variant="outline" size="sm" onClick={() => handleViewDetails(e)} className="h-8 group-hover:bg-primary group-hover:text-white transition-all">
                                                         <Search className="h-3.5 w-3.5 mr-2" />
-                                                        Consulter
+                                                        Fiche
                                                     </Button>
                                                 </td>
                                             </tr>
@@ -542,32 +518,15 @@ export default function DashboardPersonnelAdmin() {
                                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                                         <div className="lg:col-span-1 space-y-6">
                                             <section>
-                                                <h3 className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em] mb-4">Informations Générales</h3>
+                                                <h3 className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em] mb-4">Informations Dossier</h3>
                                                 <div className="space-y-4">
                                                     <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
                                                         <Label className="text-[10px] text-muted-foreground uppercase">Type d'Acteur</Label>
                                                         <p className="font-bold text-slate-900 capitalize">{selectedEntreprise.type === 'compagnie' ? 'Compagnie Importatrice' : 'Distributeur Agréé'}</p>
                                                     </div>
                                                     <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                                                        <Label className="text-[10px] text-muted-foreground uppercase">Sigle Commercial</Label>
+                                                        <Label className="text-[10px] text-muted-foreground uppercase">Sigle</Label>
                                                         <p className="font-bold text-slate-900">{selectedEntreprise.sigle || '-'}</p>
-                                                    </div>
-                                                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                                                        <Label className="text-[10px] text-muted-foreground uppercase">Date de Création (SIHG)</Label>
-                                                        <p className="font-bold text-slate-900">{new Date(selectedEntreprise.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-                                                    </div>
-                                                </div>
-                                            </section>
-
-                                            <section>
-                                                <h3 className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em] mb-4">Contact Responsable</h3>
-                                                <div className="bg-primary/5 p-4 rounded-xl border border-primary/10">
-                                                    <p className="font-bold text-slate-900">{selectedEntreprise.contact_nom || 'Non renseigné'}</p>
-                                                    <div className="mt-2 space-y-1">
-                                                        <p className="text-xs text-primary flex items-center gap-2">
-                                                            <Activity className="h-3 w-3" /> {selectedEntreprise.contact_telephone || 'N/A'}
-                                                        </p>
-                                                        <p className="text-xs text-slate-500 truncate">{selectedEntreprise.contact_email || 'N/A'}</p>
                                                     </div>
                                                 </div>
                                             </section>
@@ -575,52 +534,7 @@ export default function DashboardPersonnelAdmin() {
 
                                         <div className="lg:col-span-2 space-y-8">
                                             <section>
-                                                <div className="flex items-center justify-between mb-4">
-                                                    <h3 className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em]">Installations rattachées ({entrepriseStations.length})</h3>
-                                                </div>
-                                                <div className="border border-slate-100 rounded-xl overflow-hidden">
-                                                    <table className="w-full text-sm">
-                                                        <thead className="bg-slate-50">
-                                                            <tr>
-                                                                <th className="text-left py-3 px-4 font-bold text-[9px] uppercase text-slate-500">Installation</th>
-                                                                <th className="text-left py-3 px-4 font-bold text-[9px] uppercase text-slate-500">Type / Ville</th>
-                                                                <th className="text-right py-3 px-4 font-bold text-[9px] uppercase text-slate-500">Capacités</th>
-                                                                <th className="text-right py-3 px-4 font-bold text-[9px] uppercase text-slate-500">État</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody className="divide-y divide-slate-100">
-                                                            {entrepriseStations.length === 0 ? (
-                                                                <tr>
-                                                                    <td colSpan={4} className="py-6 text-center text-xs text-muted-foreground italic text-slate-400">Aucune station rattachée à cette entreprise</td>
-                                                                </tr>
-                                                            ) : entrepriseStations.map(s => (
-                                                                <tr key={s.id}>
-                                                                    <td className="py-3 px-4">
-                                                                        <div className="font-bold text-slate-900 text-xs">{s.nom}</div>
-                                                                        <div className="text-[9px] text-muted-foreground font-mono">ID: {s.code}</div>
-                                                                    </td>
-                                                                    <td className="py-3 px-4">
-                                                                        <div className="text-[10px] font-bold text-primary uppercase">{s.type}</div>
-                                                                        <div className="text-[9px] text-slate-500">{s.ville}</div>
-                                                                    </td>
-                                                                    <td className="py-3 px-4 text-right">
-                                                                        <div className="text-[10px] font-bold text-slate-600">E: {s.capacite_essence.toLocaleString()}L</div>
-                                                                        <div className="text-[10px] font-bold text-slate-600">G: {s.capacite_gasoil.toLocaleString()}L</div>
-                                                                    </td>
-                                                                    <td className="py-3 px-4 text-right">
-                                                                        <Badge className={cn("text-[8px] font-black h-4 px-1.5", s.statut === 'ouverte' ? 'bg-emerald-50 text-emerald-600 border-none' : 'bg-red-50 text-red-600 border-none')} variant="outline">
-                                                                            {s.statut}
-                                                                        </Badge>
-                                                                    </td>
-                                                                </tr>
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            </section>
-
-                                            <section>
-                                                <h3 className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em] mb-4">Documents Réglementaires & Agréments</h3>
+                                                <h3 className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em] mb-4">Documents Réglementaires</h3>
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                     {[
                                                         { label: "Agrément d'exploitation", date: "31/12/2026", type: "PDF", status: "ok" },
@@ -651,127 +565,72 @@ export default function DashboardPersonnelAdmin() {
                                 </div>
 
                                 <footer className="bg-slate-50 p-6 border-t border-slate-100 flex justify-end shrink-0">
-                                    <Button variant="outline" onClick={() => setIsDetailOpen(false)} className="rounded-xl px-8">Fermer la fiche</Button>
+                                    <Button variant="outline" onClick={() => setIsDetailOpen(false)} className="rounded-xl px-8">Fermer</Button>
                                 </footer>
                             </>
                         )}
                     </DialogContent>
                 </Dialog>
 
-                {/* TAB: DOCUMENTS REGLEMENTAIRES */}
+                {/* TAB: DOCUMENTS */}
                 <TabsContent value="documents" className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {[
-                            { name: "Agrément d'importation", count: 42, color: "blue" },
-                            { name: "Licence de Distribution", count: 128, color: "emerald" },
-                            { name: "Certificat de Conformité", count: 85, color: "amber" },
-                            { name: "Dossier Assurance", count: 156, color: "indigo" }
-                        ].map((doc, i) => (
-                            <Card key={i} className="hover:border-primary/30 transition-colors shadow-sm">
-                                <CardContent className="pt-6">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <div className={`h-10 w-10 rounded-xl bg-${doc.color}-50 flex items-center justify-center border border-${doc.color}-100`}>
-                                            <ClipboardCheck className={`h-5 w-5 text-${doc.color}-600`} />
-                                        </div>
-                                        <Badge variant="outline" className="bg-white">{doc.count}</Badge>
-                                    </div>
-                                    <h3 className="font-bold text-sm text-slate-900">{doc.name}</h3>
-                                    <p className="text-[10px] text-muted-foreground mt-1 tracking-tight">Dernière mise à jour: Hier</p>
-                                </CardContent>
-                            </Card>
-                        ))}
-                    </div>
-
-                    <Card className="border-none shadow-sm">
-                        <CardHeader>
-                            <CardTitle className="text-lg">Flux de Documents Entrants</CardTitle>
-                            <CardDescription>Documents administratifs en attente de vérification technique</CardDescription>
+                    <Card className="border-none shadow-sm overflow-hidden">
+                        <CardHeader className="bg-slate-50/50">
+                            <CardTitle className="text-lg flex items-center gap-2">
+                                <FileText className="h-5 w-5 text-indigo-600" />
+                                Référentiel des Documents Réglementaires
+                            </CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-4">
-                            {[
-                                { ent: "TotalEnergies", doc: "Renouvellement Agrément 2026", date: "Il y a 2h", status: "En attente" },
-                                { ent: "Vivo Energy", doc: "Rapport de Conformité Annuel", date: "Il y a 5h", status: "Vérifié" },
-                                { ent: "Kamsar Petroleum", doc: "Certificat Assurance Tiers", date: "Hier", status: "Vérifié" }
-                            ].map((item, i) => (
-                                <div key={i} className="flex items-center justify-between p-4 rounded-xl bg-slate-50 border border-slate-100">
-                                    <div className="flex items-center gap-3">
-                                        <div className="h-8 w-8 rounded bg-white flex items-center justify-center shadow-sm">
-                                            <FileText className="h-4 w-4 text-slate-400" />
+                        <CardContent className="p-0">
+                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
+                                {[
+                                    { name: "Agréments d'importation", count: 42, color: "blue" },
+                                    { name: "Licences de Distribution", count: 128, color: "emerald" },
+                                    { name: "Dossiers Entreprises", count: 85, color: "indigo" }
+                                ].map((doc, i) => (
+                                    <div key={i} className="p-6 rounded-2xl border border-slate-100 bg-white hover:shadow-lg transition-all group">
+                                        <div className={`h-12 w-12 rounded-xl bg-${doc.color}-50 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
+                                            <FolderOpen className={`h-6 w-6 text-${doc.color}-600`} />
                                         </div>
-                                        <div>
-                                            <p className="text-sm font-bold text-slate-900">{item.doc}</p>
-                                            <p className="text-[10px] text-muted-foreground font-medium">{item.ent} · <span className="text-blue-600">{item.date}</span></p>
-                                        </div>
+                                        <h3 className="font-bold text-slate-900 mb-1">{doc.name}</h3>
+                                        <p className="text-2xl font-black text-slate-900">{doc.count}</p>
+                                        <p className="text-[10px] text-muted-foreground mt-2 uppercase tracking-widest font-bold">Dernière archive: Aujourd'hui</p>
                                     </div>
-                                    <Badge className={cn("text-[10px] font-bold h-6 px-3", item.status === 'Vérifié' ? 'bg-emerald-100 text-emerald-700 border-none' : 'bg-amber-100 text-amber-700 border-none')}>
-                                        {item.status}
-                                    </Badge>
-                                </div>
-                            ))}
+                                ))}
+                             </div>
                         </CardContent>
                     </Card>
                 </TabsContent>
 
-                {/* TAB: Suivi Statuts Administratifs */}
+                {/* TAB: Historique */}
                 <TabsContent value="suivi">
                     <Card className="border-none shadow-sm">
                         <CardHeader>
                             <CardTitle className="text-lg flex items-center gap-2">
-                                <AlertCircle className="h-5 w-5 text-amber-500" />
-                                Suivi des Statuts Administratifs
+                                <Activity className="h-5 w-5 text-emerald-500" />
+                                Historique Administratif
                             </CardTitle>
-                            <CardDescription>État des agréments et alertes de renouvellement par entreprise</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-4">
-                                {filteredEntreprises.length === 0 ? (
-                                    <div className="py-12 text-center text-muted-foreground">
-                                        <FolderOpen className="h-10 w-10 mx-auto mb-3 opacity-20" />
-                                        <p className="text-sm font-medium">Aucune entreprise trouvée</p>
-                                    </div>
-                                ) : filteredEntreprises.map(e => {
-                                    const hasIssue = (e.documents_expires ?? 0) > 0;
-                                    return (
-                                        <div key={e.id} className={cn(
-                                            "flex items-center gap-4 p-4 rounded-xl border relative overflow-hidden transition-all hover:shadow-md",
-                                            hasIssue ? 'bg-amber-50 border-amber-200' : 'bg-slate-50/50 border-slate-100'
-                                        )}>
-                                            <div className={cn(
-                                                "absolute left-0 top-0 bottom-0 w-1.5",
-                                                hasIssue ? 'bg-amber-500' : 'bg-emerald-500'
-                                            )} />
-                                            <div className="h-11 w-11 rounded-lg bg-white border border-slate-200 flex items-center justify-center font-black text-sm text-primary shrink-0 shadow-sm">
-                                                {e.sigle?.[0] || e.nom[0]}
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <p className="font-bold text-slate-900 truncate tracking-tight">{e.nom}</p>
-                                                    <Badge variant="outline" className={cn("text-[9px] font-black uppercase tracking-widest shrink-0", statusColor(e.statut))}>{e.statut}</Badge>
-                                                </div>
-                                                <div className="flex items-center gap-3 mt-1 text-[10px] text-muted-foreground font-medium">
-                                                    <span className="font-mono text-slate-900 bg-white px-1.5 py-0.5 rounded border border-slate-100">{e.numero_agrement}</span>
-                                                    <span>·</span>
-                                                    <span className="uppercase tracking-tighter">{e.region}</span>
-                                                    <span>·</span>
-                                                    <span className="capitalize">{e.type}</span>
-                                                </div>
-                                            </div>
-                                            <div className="shrink-0">
-                                                {hasIssue ? (
-                                                    <div className="bg-white p-2 rounded-lg border border-amber-200">
-                                                        <Badge variant="destructive" className="text-[9px] font-black mb-1 px-2">{e.documents_expires} ALERTES</Badge>
-                                                        <div className="text-[9px] text-amber-600 font-black uppercase text-center">⚠ Renouveler</div>
-                                                    </div>
-                                                ) : (
-                                                    <div className="flex flex-col items-center px-4">
-                                                        <CheckCircle2 className="h-6 w-6 text-emerald-500" />
-                                                        <span className="text-[9px] text-emerald-600 font-black uppercase tracking-widest mt-1">Conforme</span>
-                                                    </div>
-                                                )}
-                                            </div>
+                                {[
+                                    { action: "Validation Administrative", target: "Station Bambeto - Vivo", date: "Il y a 10 min", user: "Chef Service Admin" },
+                                    { action: "Nouvelle Entreprise", target: "Guinea Oil Corp", date: "Il y a 1h", user: "Agent Admin" },
+                                    { action: "Mise à jour Licence", target: "TotalEnergies", date: "Ce matin", user: "Gestionnaire Doc" }
+                                ].map((log, i) => (
+                                    <div key={i} className="flex items-center gap-4 p-4 rounded-xl border border-slate-100 bg-slate-50/50 transition-all hover:bg-white hover:shadow-sm">
+                                        <div className="h-10 w-10 rounded-full bg-white flex items-center justify-center text-primary border border-slate-100">
+                                            <Shield className="h-5 w-5" />
                                         </div>
-                                    );
-                                })}
+                                        <div className="flex-1">
+                                            <div className="flex items-center justify-between">
+                                                <p className="font-bold text-slate-900">{log.action}</p>
+                                                <span className="text-[10px] text-muted-foreground font-medium">{log.date}</span>
+                                            </div>
+                                            <p className="text-xs text-slate-500">{log.target} · <span className="text-primary font-bold">{log.user}</span></p>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         </CardContent>
                     </Card>

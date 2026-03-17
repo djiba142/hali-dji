@@ -7,10 +7,44 @@ export type UserRole =
   | 'admin_etat'
   | 'inspecteur'
   | 'analyste'
-  | 'personnel_admin'
   | 'service_it'
+  | 'secretaire_general'
+  | 'directeur_general'
+  | 'directeur_adjoint'
+  | 'directeur_aval'
+  | 'directeur_adjoint_aval'
+  | 'chef_division_distribution'
+  | 'chef_bureau_aval'
+  | 'agent_supervision_aval'
+  | 'controleur_distribution'
+  | 'technicien_support_dsa'
+  | 'technicien_flux'
   | 'responsable_entreprise'
-  | 'gestionnaire_station';
+  | 'responsable_stations'
+  | 'gestionnaire_livraisons'
+  | 'operateur_entreprise'
+  | 'directeur_juridique'
+  | 'juriste'
+  | 'charge_conformite'
+  | 'assistant_juridique'
+  | 'directeur_financier'
+  | 'controleur_financier'
+  | 'comptable'
+  | 'directeur_importation'
+  | 'agent_importation'
+  | 'directeur_administratif'
+  | 'chef_service_administratif'
+  | 'agent_administratif'
+  | 'gestionnaire_documentaire'
+  | 'personnel_admin'
+  | 'directeur_logistique'
+  | 'agent_logistique'
+  | 'responsable_depots'
+  | 'responsable_transport'
+  | 'operateur_logistique'
+  | 'responsable_stock'
+  | 'agent_station'
+  | 'technicien_aval';
 
 export type EntrepriseType = 'compagnie' | 'distributeur';
 
@@ -18,13 +52,47 @@ export type StationType = 'urbaine' | 'routiere' | 'depot' | string;
 
 export type AlertType = 'stock_critical' | 'stock_warning' | 'price_anomaly' | 'station_closed';
 
+export type DossierStatus = 
+  | 'nouveau'
+  | 'en_cours_verification'
+  | 'analyse_technique'
+  | 'analyse_administrative'
+  | 'analyse_juridique'
+  | 'approuve'
+  | 'rejete'
+  | 'archive';
+
+export interface Dossier {
+  id: string;
+  numero_dossier: string;
+  type_demande: 'ouverture_station' | 'agrement_entreprise' | 'renouvellement_licence';
+  entite_id: string;
+  entite_type: 'station' | 'entreprise';
+  entite_nom: string;
+  statut: DossierStatus;
+  priorite: 'haute' | 'normale' | 'basse';
+  observations?: string;
+  pieces_jointes: string[];
+  date_soumission: string;
+  updated_at: string;
+  valide_par_dsa?: string;
+  valide_par_da?: string;
+  valide_par_djc?: string;
+  valide_par_dsi?: string;
+  valide_par_dg?: string;
+  rccm_url?: string;
+  nif_url?: string;
+  statuts_url?: string;
+  autorisation_url?: string;
+}
+
 export type StationStatus = 
   | 'ouverte' 
   | 'fermee' 
   | 'en_travaux' 
   | 'suspendu_legal'
   | 'attente_dsa'      // Direction des Services Aval (Technique)
-  | 'attente_dla'      // Direction Logistique et Administrative
+  | 'attente_da'       // Direction Administrative
   | 'attente_djc'      // Direction Juridique / Conformité
   | 'attente_dsi'      // Direction Service Information (Activation)
   | string;
@@ -34,7 +102,7 @@ export type EntrepriseStatus =
   | 'suspendu' 
   | 'ferme'
   | 'attente_dsa'
-  | 'attente_dla'
+  | 'attente_da'
   | 'attente_djc'
   | 'attente_dsi';
 

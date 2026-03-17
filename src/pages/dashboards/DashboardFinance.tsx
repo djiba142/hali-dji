@@ -229,8 +229,8 @@ export default function DashboardFinance() {
                     variant="outline" 
                     size="sm" 
                     className="rounded-xl font-black text-[10px] uppercase tracking-widest gap-2 bg-emerald-500/10 border-emerald-500/20 text-emerald-600 hover:bg-emerald-500 hover:text-white"
-                    onClick={() => {
-                      const headers = ['Direction', 'Montant Alloué', 'Montant Utilisé', 'Utilisation %', 'Statut'];
+                    onClick={async () => {
+                      const headers = ['Direction', 'Montant Alloué (GNF)', 'Montant Utilisé (GNF)', 'Utilisation (%)', 'Statut'];
                       const rows = budgets.map(b => [
                         b.direction, 
                         b.montant_alloue, 
@@ -238,18 +238,27 @@ export default function DashboardFinance() {
                         b.montant_alloue > 0 ? ((b.montant_utilise / b.montant_alloue) * 100).toFixed(1) + '%' : '0%',
                         b.statut
                       ]);
-                      const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-                      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                      const link = document.createElement('a');
-                      link.href = URL.createObjectURL(blob);
-                      link.download = `budget_global_${new Date().getFullYear()}.csv`;
-                      link.click();
-                      toast.success("Rapport budgétaire exporté", {
-                        description: "Le fichier CSV a été généré avec succès."
-                      });
+                      
+                      try {
+                        toast.loading("Génération de l'Excel certifié...");
+                        const { generateExcelReport } = await import('@/lib/excelExport');
+                        await generateExcelReport({
+                          title: `Suivi Budgétaire Global SONAP - ${new Date().getFullYear()}`,
+                          filename: `Budget_Official_SONAP_${new Date().getFullYear()}`,
+                          headers,
+                          data: rows,
+                          signerRole: role || 'directeur_financier',
+                          signerName: profile?.full_name || 'Direction Financière'
+                        });
+                        toast.dismiss();
+                        toast.success("Rapport Excel exporté avec logos et signatures");
+                      } catch (err) {
+                        toast.dismiss();
+                        toast.error("Erreur lors de l'export Excel");
+                      }
                     }}
                   >
-                    <Download className="h-3 w-3" /> Exporter Budget
+                    <Download className="h-4 w-4" /> Exporter Excel Certifié
                   </Button>
                   <Button 
                     variant="outline" 
@@ -396,24 +405,31 @@ export default function DashboardFinance() {
                   <Button 
                     variant="ghost" 
                     className="w-full h-10 rounded-xl text-slate-500 font-black uppercase text-[9px] tracking-widest gap-2 hover:bg-slate-50 transition-all"
-                    onClick={() => {
-                      const headers = ['Direction', 'Budget Alloué', 'Budget Utilisé', 'Utilisation %'];
+                    onClick={async () => {
+                      const headers = ['Direction', 'Budget Alloué (GNF)', 'Budget Utilisé (GNF)', 'Utilisation (%)'];
                       const rows = budgets.map(b => [
                         b.direction, 
                         b.montant_alloue, 
                         b.montant_utilise, 
                         b.montant_alloue > 0 ? ((b.montant_utilise / b.montant_alloue) * 100).toFixed(1) + '%' : '0%'
                       ]);
-                      const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-                      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                      const link = document.createElement('a');
-                      link.href = URL.createObjectURL(blob);
-                      link.download = `registre_financier_${new Date().toISOString().split('T')[0]}.csv`;
-                      link.click();
-                      toast.success('Rapport exporté', { description: 'Le registre financier a été téléchargé au format CSV.' });
+                      try {
+                        const { generateExcelReport } = await import('@/lib/excelExport');
+                        await generateExcelReport({
+                          title: `Registre Financier SONAP - ${new Date().toISOString().split('T')[0]}`,
+                          filename: `registre_financier_${new Date().toISOString().split('T')[0]}`,
+                          headers,
+                          data: rows,
+                          signerRole: role || 'directeur_financier',
+                          signerName: profile?.full_name || 'Direction Financière'
+                        });
+                        toast.success('Rapport exporté', { description: 'Le registre financier Excel a été téléchargé.' });
+                      } catch {
+                        toast.error('Erreur d\'export');
+                      }
                     }}
                   >
-                    <Download className="h-3.5 w-3.5" /> Registre CSV
+                    <Download className="h-3.5 w-3.5" /> Registre Excel Certifié
                   </Button>
                 </div>
               )}

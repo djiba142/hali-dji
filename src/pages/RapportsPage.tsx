@@ -70,7 +70,7 @@ const reportTypes: ReportType[] = [
     icon: BarChart3,
     frequency: 'Quotidien',
     lastGenerated: 'En temps réel',
-    roles: ['super_admin', 'directeur_general', 'directeur_adjoint', 'admin_etat', 'directeur_aval', 'directeur_adjoint_aval', 'chef_division_distribution', 'agent_supervision_aval', 'controleur_distribution']
+    roles: ['super_admin', 'directeur_general', 'directeur_adjoint', 'admin_etat', 'secretaire_general', 'directeur_aval', 'directeur_adjoint_aval', 'chef_division_distribution', 'agent_supervision_aval', 'controleur_distribution']
   },
   {
     id: 'consommation-nationale',
@@ -79,7 +79,7 @@ const reportTypes: ReportType[] = [
     icon: TrendingUp,
     frequency: 'Hebdomadaire',
     lastGenerated: '08/03/2026',
-    roles: ['super_admin', 'directeur_general', 'directeur_adjoint', 'admin_etat', 'analyste', 'directeur_aval', 'directeur_adjoint_aval', 'chef_division_distribution', 'agent_supervision_aval', 'inspecteur']
+    roles: ['super_admin', 'directeur_general', 'directeur_adjoint', 'admin_etat', 'secretaire_general', 'directeur_administratif', 'directeur_juridique', 'juriste', 'charge_conformite', 'agent_supervision_aval', 'inspecteur', 'personnel_admin']
   },
   {
     id: 'performance-entreprises',
@@ -88,7 +88,7 @@ const reportTypes: ReportType[] = [
     icon: BarChart3,
     frequency: 'Mensuel',
     lastGenerated: '01/03/2026',
-    roles: ['super_admin', 'directeur_general', 'directeur_adjoint', 'admin_etat', 'personnel_admin', 'directeur_aval', 'directeur_adjoint_aval', 'analyste', 'inspecteur', 'directeur_juridique', 'juriste', 'charge_conformite']
+    roles: ['super_admin', 'directeur_general', 'directeur_adjoint', 'admin_etat', 'secretaire_general', 'directeur_administratif', 'chef_service_administratif', 'directeur_aval', 'directeur_adjoint_aval', 'analyste', 'inspecteur', 'directeur_juridique', 'juriste', 'charge_conformite', 'personnel_admin']
   },
   {
     id: 'prevision-penurie',
@@ -97,7 +97,7 @@ const reportTypes: ReportType[] = [
     icon: AlertCircle,
     frequency: 'Quotidien',
     lastGenerated: '09/03/2026',
-    roles: ['super_admin', 'directeur_general', 'directeur_adjoint', 'admin_etat', 'analyste', 'directeur_aval', 'directeur_adjoint_aval', 'chef_division_distribution']
+    roles: ['super_admin', 'directeur_general', 'directeur_adjoint', 'admin_etat', 'secretaire_general', 'analyste', 'directeur_aval', 'directeur_adjoint_aval', 'chef_division_distribution']
   },
   {
     id: 'flux-aval',
@@ -106,7 +106,7 @@ const reportTypes: ReportType[] = [
     icon: FileSpreadsheet,
     frequency: 'Quotidien',
     lastGenerated: 'En temps réel',
-    roles: ['super_admin', 'directeur_general', 'directeur_adjoint', 'admin_etat', 'directeur_aval', 'directeur_adjoint_aval', 'chef_division_distribution', 'agent_supervision_aval', 'controleur_distribution']
+    roles: ['super_admin', 'directeur_general', 'directeur_adjoint', 'admin_etat', 'secretaire_general', 'directeur_aval', 'directeur_adjoint_aval', 'chef_division_distribution', 'agent_supervision_aval', 'controleur_distribution', 'gestionnaire_livraisons']
   },
   {
     id: 'stock-station',
@@ -115,7 +115,7 @@ const reportTypes: ReportType[] = [
     icon: BarChart3,
     frequency: 'Quotidien',
     lastGenerated: 'En temps réel',
-    roles: ['responsable_entreprise', 'operateur_entreprise', 'directeur_aval', 'directeur_adjoint_aval', 'chef_division_distribution', 'agent_supervision_aval', 'controleur_distribution']
+    roles: ['super_admin', 'secretaire_general', 'responsable_entreprise', 'responsable_stations', 'gestionnaire_livraisons', 'operateur_entreprise', 'directeur_aval', 'directeur_adjoint_aval', 'chef_division_distribution', 'agent_supervision_aval', 'controleur_distribution']
   },
   {
     id: 'ventes-station',
@@ -124,7 +124,7 @@ const reportTypes: ReportType[] = [
     icon: TrendingUp,
     frequency: 'Quotidien',
     lastGenerated: 'En temps réel',
-    roles: ['responsable_entreprise', 'operateur_entreprise', 'directeur_aval', 'directeur_adjoint_aval', 'chef_division_distribution', 'agent_supervision_aval', 'controleur_distribution']
+    roles: ['super_admin', 'secretaire_general', 'responsable_entreprise', 'responsable_stations', 'operateur_entreprise', 'directeur_aval', 'directeur_adjoint_aval', 'chef_division_distribution', 'agent_supervision_aval', 'controleur_distribution']
   },
   {
     id: 'livraisons-station',
@@ -133,7 +133,7 @@ const reportTypes: ReportType[] = [
     icon: FileSpreadsheet,
     frequency: 'Hebdomadaire',
     lastGenerated: '07/03/2026',
-    roles: ['responsable_entreprise', 'operateur_entreprise', 'directeur_aval', 'directeur_adjoint_aval', 'chef_division_distribution', 'agent_supervision_aval', 'controleur_distribution']
+    roles: ['super_admin', 'secretaire_general', 'responsable_entreprise', 'gestionnaire_livraisons', 'operateur_entreprise', 'directeur_aval', 'directeur_adjoint_aval', 'chef_division_distribution', 'agent_supervision_aval', 'controleur_distribution']
   },
   {
     id: 'inspections-terrain',
@@ -169,7 +169,7 @@ const reportTypes: ReportType[] = [
     icon: FileText,
     frequency: 'Mensuel',
     lastGenerated: 'En temps réel',
-    roles: ['super_admin', 'directeur_financier', 'controleur_financier', 'comptable', 'directeur_general', 'directeur_adjoint']
+    roles: ['super_admin', 'directeur_financier', 'controleur_financier', 'comptable', 'directeur_general', 'directeur_adjoint', 'secretaire_general']
   }
 ];
 
@@ -213,15 +213,17 @@ export default function RapportsPage() {
   const [recentReports, setRecentReports] = useState<RecentReport[]>([]);
   const [loadingReports, setLoadingReports] = useState(true);
   const [dataStats, setDataStats] = useState({ entreprises: 0, stations: 0, alertes: 0, importations: 0 });
+  const [entrepriseLogo, setEntrepriseLogo] = useState<string | undefined>(undefined);
 
   const isGeneratingRef = React.useRef(false);
 
   useEffect(() => {
     loadRecentReports();
     loadDataStats();
+    fetchEntrepriseLogo();
     const timer = setTimeout(() => setLoadingReports(false), 800);
     return () => clearTimeout(timer);
-  }, []);
+  }, [profile?.entreprise_id]);
 
   const loadDataStats = async () => {
     try {
@@ -239,6 +241,17 @@ export default function RapportsPage() {
       });
     } catch (err) {
       console.error('Stats loading error:', err);
+    }
+  };
+
+  const fetchEntrepriseLogo = async () => {
+    if (profile?.entreprise_id) {
+      const { data } = await supabase
+        .from('entreprises')
+        .select('logo_url')
+        .eq('id', profile.entreprise_id)
+        .maybeSingle();
+      if (data?.logo_url) setEntrepriseLogo(data.logo_url);
     }
   };
 
@@ -313,14 +326,18 @@ export default function RapportsPage() {
           autonomieEssence: 12, // Mock or calculate
           autonomieGasoil: 15,
           signerRole: role || undefined,
-          signerName: profile?.full_name || undefined
+          signerName: profile?.full_name || undefined,
+          entrepriseLogo: entrepriseLogo
         });
       } else {
         // Simple custom report for other types
-        await generateCustomReportPDF({ type, title,
-        signerRole: role || undefined,
-        signerName: profile?.full_name || undefined
-      });
+        await generateCustomReportPDF({ 
+          type, 
+          title,
+          signerRole: role || undefined,
+          signerName: profile?.full_name || undefined,
+          entrepriseLogo: entrepriseLogo
+        });
       }
       
       if (!isPrinting) {
@@ -378,7 +395,8 @@ export default function RapportsPage() {
         filename: `Export_SIHG_${selectedType}_${new Date().toISOString().slice(0, 10)}`,
         headers,
         data,
-        signerRole: role || undefined
+        signerRole: role || undefined,
+        signerName: profile?.full_name || 'Agent SIHG'
       });
       
       toast({ title: "✅ Export Terminé", description: "Le fichier Excel a été généré avec succès." });

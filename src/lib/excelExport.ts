@@ -6,42 +6,89 @@ import sonapLogoUrl from '@/assets/sonap.jpeg';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
-// ── Rôles supportés (Synchronisé avec pdfExport.ts) ────────────────
+// ── Rôles supportés ────────────────────────────────────────────
 export type AppRole =
-  | 'super_admin' | 'admin_etat' | 'directeur_general' | 'directeur_adjoint'
+  | 'super_admin' | 'admin_etat' | 'directeur_general' | 'directeur_adjoint' | 'secretaire_general'
   | 'directeur_aval' | 'directeur_adjoint_aval' | 'chef_division_distribution' | 'chef_bureau_aval'
   | 'agent_supervision_aval' | 'controleur_distribution' | 'technicien_support_dsa' | 'technicien_flux'
   | 'inspecteur' | 'analyste'
-  | 'personnel_admin' | 'service_it' | 'responsable_entreprise'
+  | 'service_it' | 'responsable_entreprise' | 'responsable_stations' | 'gestionnaire_livraisons'
   | 'technicien_aval' | 'operateur_entreprise'
   | 'directeur_juridique' | 'juriste' | 'charge_conformite' | 'assistant_juridique'
   | 'directeur_financier' | 'controleur_financier' | 'comptable'
-  | 'directeur_importation' | 'agent_importation' | 'directeur_logistique' | 'agent_logistique';
+  | 'directeur_importation' | 'agent_importation' 
+  | 'directeur_logistique' | 'agent_logistique' | 'responsable_depots' | 'responsable_transport' | 'operateur_logistique'
+  | 'personnel_admin' | 'directeur_financier' | 'directeur_importation' | 'directeur_juridique';
 
 const ROLE_SIGNATURE: Record<string, { gauche: string; droite: string }> = {
-  directeur_general:  { gauche: '', droite: "SIGNATURE" },
-  directeur_adjoint:  { gauche: '', droite: "SIGNATURE" },
-  admin_etat:         { gauche: '', droite: "SIGNATURE" },
-  directeur_aval:     { gauche: '', droite: "SIGNATURE" },
-  directeur_adjoint_aval: { gauche: '', droite: "SIGNATURE" },
-  inspecteur:         { gauche: '', droite: "SIGNATURE" },
-  analyste:           { gauche: '', droite: "SIGNATURE" },
-  personnel_admin:    { gauche: '', droite: "SIGNATURE" },
-  service_it:         { gauche: '', droite: "SIGNATURE" },
-  responsable_entreprise: { gauche: '', droite: "SIGNATURE" },
-
-  super_admin:        { gauche: '', droite: "SIGNATURE" },
+  directeur_general:  { gauche: '',  droite: "LE DIRECTEUR GÉNÉRAL" },
+  directeur_adjoint:  { gauche: '', droite: "LE DIRECTEUR GÉNÉRAL ADJOINT" },
+  admin_etat:         { gauche: '', droite: "L'ADMINISTRATEUR D'ÉTAT" },
+  directeur_aval:     { gauche: '', droite: "LE DIRECTEUR DE L'AVAL" },
+  directeur_adjoint_aval: { gauche: '', droite: "LE DIRECTEUR ADJOINT DE L'AVAL" },
+  chef_division_distribution: { gauche: '', droite: "LE CHEF DIVISION DISTRIBUTION" },
+  inspecteur:         { gauche: '', droite: "L'INSPECTEUR SIHG" },
+  analyste:           { gauche: '', droite: "L'ANALYSTE STRATÉGIQUE" },
+  directeur_administratif: { gauche: '', droite: "LE DIRECTEUR ADMINISTRATIF" },
+  chef_service_administratif: { gauche: '', droite: "LE CHEF SERVICE ADMINISTRATIF" },
+  agent_administratif: { gauche: '', droite: "L'AGENT ADMINISTRATIF" },
+  gestionnaire_documentaire: { gauche: '', droite: "LE GESTIONNAIRE DOCUMENTAIRE" },
+  service_it:         { gauche: '', droite: "LE RESPONSABLE S.I." },
+  responsable_entreprise: { gauche: '', droite: "LE DIRECTEUR D'ENTREPRISE" },
+  responsable_stations:   { gauche: '', droite: "LE RESPONSABLE STATIONS" },
+  gestionnaire_livraisons: { gauche: '', droite: "LE GESTIONNAIRE LIVRAISONS" },
+  secretaire_general:     { gauche: '', droite: "LE SECRÉTAIRE GÉNÉRAL" },
+  super_admin:            { gauche: '', droite: "L'ADMINISTRATEUR SYSTÈME" },
+  directeur_juridique:    { gauche: '', droite: "LE DIRECTEUR JURIDIQUE" },
+  directeur_financier:    { gauche: '', droite: "LE DIRECTEUR FINANCIER" },
+  directeur_importation:  { gauche: '', droite: "LE DIRECTEUR DES IMPORTATIONS" },
+  directeur_logistique:   { gauche: '', droite: "LE DIRECTEUR LOGISTIQUE" },
+  responsable_depots:     { gauche: '', droite: "LE RESPONSABLE DES DÉPÔTS" },
+  responsable_transport:  { gauche: '', droite: "LE RESPONSABLE TRANSPORT" },
+  operateur_logistique:   { gauche: '', droite: "L'OPÉRATEUR LOGISTIQUE" },
+  personnel_admin:       { gauche: '', droite: "LE PERSONNEL ADMINISTRATIF" },
+  agent_importation:     { gauche: '', droite: "L'AGENT D'IMPORTATION" },
+  juriste:               { gauche: '', droite: "LE JURISTE" },
+  comptable:             { gauche: '', droite: "LE COMPTABLE" },
+  agent_logistique:      { gauche: '', droite: "L'AGENT LOGISTIQUE" },
 };
 
-// Helper: Convert Image URL to Base64 (Buffer for ExcelJS)
-const getLogoBuffer = async (url: string): Promise<ArrayBuffer | null> => {
-    try {
-        const response = await fetch(url);
-        return await response.arrayBuffer();
-    } catch (error) {
-        console.error('Error fetching logo buffer:', error);
-        return null;
-    }
+// Helper: Convert Image URL to Base64 with fallback and better error handling
+const getLogoBase64 = (url: string): Promise<string | null> => {
+    return new Promise((resolve) => {
+        if (!url) return resolve(null);
+        if (url.startsWith('data:')) return resolve(url);
+
+        const img = new Image();
+        img.crossOrigin = 'anonymous'; 
+        
+        const timeout = setTimeout(() => {
+            img.src = ''; 
+            resolve(null);
+        }, 8000); // 8 seconds timeout
+
+        img.onload = () => {
+            clearTimeout(timeout);
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return resolve(null);
+                ctx.drawImage(img, 0, 0);
+                resolve(canvas.toDataURL('image/png'));
+            } catch (e) {
+                console.error("Excel Logo Error:", e);
+                // Fallback attempt without CORS if possible (though unlikely to work if already failed)
+                resolve(null);
+            }
+        };
+        img.onerror = () => {
+            clearTimeout(timeout);
+            resolve(null);
+        };
+        img.src = url;
+    });
 };
 
 interface ExcelExportOptions {
@@ -50,7 +97,9 @@ interface ExcelExportOptions {
     headers: string[];
     data: any[][];
     signerRole?: string;
+    signerName?: string;
     sheetName?: string;
+    entrepriseLogo?: string;
 }
 
 export async function generateExcelReport({
@@ -59,17 +108,19 @@ export async function generateExcelReport({
     headers,
     data,
     signerRole,
-    sheetName = 'Rapport SIHG'
+    signerName,
+    sheetName = 'Rapport SIHG',
+    entrepriseLogo
 }: ExcelExportOptions) {
     const workbook = new ExcelJS.Workbook();
-    workbook.creator = 'SIHG SONAP - Système National';
+    workbook.creator = 'SIHG SONAP';
     workbook.created = new Date();
 
     const sheet = workbook.addWorksheet(sheetName, {
         views: [{ showGridLines: false }]
     });
 
-    // 1. Column Auto-sizing based on data & headers
+    // 1. Configuration des colonnes
     const colWidths = headers.map(h => Math.max(h.length + 5, 15));
     data.forEach(row => {
         row.forEach((cell, i) => {
@@ -79,90 +130,90 @@ export async function generateExcelReport({
     });
 
     sheet.columns = [
-        { width: 3 }, // Margin A
-        ...headers.map((h, i) => ({ width: Math.min(colWidths[i], 40) })),
-        { width: 3 }  // Mid margin
+        { width: 5 }, // Colonne A (Marge)
+        ...headers.map((h, i) => ({ width: Math.min(colWidths[i], 45) })),
+        { width: 5 }  // Colonne finale
     ];
 
-    // 2. Official Header (Flag Stripes)
-    // We simulate the flag with colored cells
-    const lastColLetter = String.fromCharCode(66 + headers.length - 1); // Starts from B
+    // 2. Bande Tricolore (Drapeau)
+    const lastColIndex = headers.length + 1;
     
-    // Flag Colors
-    const flagRange = `B1:${lastColLetter}1`;
-    sheet.mergeCells(flagRange);
-    const flagRow = sheet.getRow(1);
+    sheet.getRow(1).height = 10;
+    const third = Math.floor(headers.length / 3);
     
-    // Official Layout Heights
-    sheet.getRow(2).height = 65; // Logos space
-    sheet.getRow(3).height = 25; // SIHG text
-    sheet.getRow(4).height = 30; // Title
+    for (let c = 2; c <= lastColIndex; c++) {
+        const cell = sheet.getCell(1, c);
+        let color = 'FF00944D'; // Vert
+        if (c <= 2 + third) color = 'FFCE1126'; // Rouge
+        else if (c <= 2 + 2 * third) color = 'FFFCD116'; // Jaune
+        
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: color } };
+    }
 
-    // 3. LOGOS
-    const nexusBuffer = await getLogoBuffer(logoUrl);
-    const sonapBuffer = await getLogoBuffer(sonapLogoUrl);
+    // 3. Header Spacing - Increased for more "air"
+    sheet.getRow(2).height = 100;
+    sheet.mergeCells(2, 2, 2, lastColIndex);
+    const instCell = sheet.getCell(2, 2);
+    instCell.value = "RÉPUBLIQUE DE GUINÉE\nPRÉSIDENCE DE LA RÉPUBLIQUE\nSOCIÉTÉ NATIONALE DES PÉTROLES (SONAP)\n\nSYSTÈME INTÉGRÉ DE GESTION DES HYDROCARBURES (SIHG)";
+    instCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    instCell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF1F2937' } };
 
-    if (nexusBuffer) {
-        const logoId = workbook.addImage({
-            buffer: nexusBuffer,
-            extension: 'png',
-        });
-        sheet.addImage(logoId, {
-            tl: { col: 1, row: 1 }, 
-            ext: { width: 80, height: 80 },
-            editAs: 'oneCell'
+    // 4. Logo SONAP & SIHG - Better positioning
+    const sihgBase64 = await getLogoBase64(logoUrl);
+    const sonapBase64 = await getLogoBase64(sonapLogoUrl);
+
+    if (sihgBase64) {
+        const id = workbook.addImage({ base64: sihgBase64, extension: 'png' });
+        sheet.addImage(id, {
+            tl: { col: 1.2, row: 1.1 }, // Column B
+            ext: { width: 85, height: 85 }
         });
     }
 
-    if (sonapBuffer) {
-        const sonapId = workbook.addImage({
-            buffer: sonapBuffer,
-            extension: 'jpeg',
-        });
-        // Sonap on the right
-        sheet.addImage(sonapId, {
-            tl: { col: headers.length, row: 1 },
-            ext: { width: 80, height: 80 },
-            editAs: 'oneCell'
+    if (sonapBase64) {
+        const id = workbook.addImage({ base64: sonapBase64, extension: 'png' });
+        sheet.addImage(id, {
+            tl: { col: lastColIndex - 0.9, row: 1.1 }, // Right side
+            ext: { width: 85, height: 85 }
         });
     }
 
-    // 4. Institutional Text
-    const centerCol = Math.floor(headers.length / 2) + 1;
-    sheet.mergeCells(`C2:${lastColLetter}2`);
-    const headerTextCell = sheet.getCell('C2');
-    headerTextCell.value = "REPUBLIQUE DE GUINEE\nPRESIDENCE DE LA REPUBLIQUE\nSOCIETE NATIONALE DES PETROLES (SONAP)";
-    headerTextCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-    headerTextCell.font = { name: 'Arial', size: 10, bold: true };
+    // Logo Entreprise additionnel
+    if (entrepriseLogo) {
+        const entBase64 = await getLogoBase64(entrepriseLogo);
+        if (entBase64) {
+            const id = workbook.addImage({ base64: entBase64, extension: 'png' });
+            sheet.addImage(id, {
+                tl: { col: lastColIndex - 1.9, row: 1.1 },
+                ext: { width: 75, height: 75 }
+            });
+        }
+    }
 
-    sheet.mergeCells(`C3:${lastColLetter}3`);
-    const subTitleCell = sheet.getCell('C3');
-    subTitleCell.value = "Système Intégré de Gestion des Hydrocarbures (SIHG)";
-    subTitleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-    subTitleCell.font = { name: 'Arial', size: 9, italic: true, color: { argb: 'FF00944D' } };
-
-    // 5. Report Title
-    sheet.mergeCells(`B4:${lastColLetter}4`);
-    const titleCell = sheet.getCell('B4');
+    // 5. Titre du Rapport
+    sheet.getRow(4).height = 35;
+    sheet.mergeCells(4, 2, 4, lastColIndex);
+    const titleCell = sheet.getCell(4, 2);
     titleCell.value = title.toUpperCase();
     titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-    titleCell.font = { name: 'Arial', size: 14, bold: true, color: { argb: 'FFCE1126' } };
-    titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8F9FA' } };
+    titleCell.font = { name: 'Arial', size: 16, bold: true, color: { argb: 'FFCE1126' } };
+    titleCell.border = { bottom: { style: 'medium', color: { argb: 'FFCE1126' } } };
 
-    const dateCell = sheet.getCell('B5');
-    sheet.mergeCells(`B5:${lastColLetter}5`);
-    dateCell.value = `Généré le: ${format(new Date(), 'dd MMMM yyyy à HH:mm', { locale: fr })}`;
-    dateCell.alignment = { horizontal: 'center' };
-    dateCell.font = { name: 'Arial', size: 9, italic: true };
+    sheet.getRow(5).height = 20;
+    sheet.mergeCells(5, 2, 5, lastColIndex);
+    const dateCell = sheet.getCell(5, 2);
+    dateCell.value = `Généré officiellement le ${format(new Date(), 'dd MMMM yyyy à HH:mm', { locale: fr })}`;
+    dateCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    dateCell.font = { name: 'Arial', size: 9, italic: true, color: { argb: 'FF6B7280' } };
 
-    // 6. Data Headers
-    const headerRowNum = 7;
-    const headerRow = sheet.getRow(headerRowNum);
-    headerRow.height = 25;
+    // 6. Tableau - Headers
+    const startRow = 7;
+    const headerRow = sheet.getRow(startRow);
+    headerRow.height = 30;
     
     headers.forEach((h, i) => {
         const cell = headerRow.getCell(i + 2);
-        cell.value = h;
+        cell.value = h.toUpperCase();
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF00944D' } };
         cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
         cell.alignment = { horizontal: 'center', vertical: 'middle' };
@@ -172,66 +223,95 @@ export async function generateExcelReport({
         };
     });
 
-    // 7. Insert Data
+    // 7. Tableau - Data
     data.forEach((rowData, rowIndex) => {
-        const row = sheet.getRow(headerRowNum + 1 + rowIndex);
-        row.height = 20;
+        const row = sheet.getRow(startRow + 1 + rowIndex);
+        row.height = 25;
         rowData.forEach((val, colIndex) => {
             const cell = row.getCell(colIndex + 2);
             cell.value = val;
-            cell.alignment = { vertical: 'middle' };
+            cell.alignment = { vertical: 'middle', horizontal: 'center' };
             cell.font = { name: 'Arial', size: 10 };
             cell.border = {
-                top: { style: 'thin' }, left: { style: 'thin' },
-                bottom: { style: 'thin'}, right: { style: 'thin'}
+                top: { style: 'thin', color: { argb: 'FFDEE2E6' } },
+                left: { style: 'thin', color: { argb: 'FFDEE2E6' } },
+                bottom: { style: 'thin', color: { argb: 'FFDEE2E6' } },
+                right: { style: 'thin', color: { argb: 'FFDEE2E6' } }
             };
             
-            // Auto formats
+            if (rowIndex % 2 === 0) {
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } };
+            }
+            
             if (typeof val === 'number') {
-                cell.numFmt = '#,##0.00';
+                cell.numFmt = '#,##0';
+                cell.alignment = { horizontal: 'right', vertical: 'middle' };
             }
         });
     });
 
-    // 8. Signatures & QR Code at the bottom
-    const bottomRowNum = headerRowNum + data.length + 3;
-    
-    // QR CODE
+    // 8. Signature & QR Code - Professional Layout
+    let currentY = startRow + data.length + 4;
+    sheet.getRow(currentY).height = 100;
+
+    // QR Code on the left (certification)
     try {
-        const qrData = JSON.stringify({
-            doc: title,
-            ref: Math.random().toString(36).substring(7).toUpperCase(),
-            date: new Date().toISOString()
+        const qrData = JSON.stringify({ 
+            doc: title, 
+            date: new Date().toISOString(), 
+            verify: `https://sihg.sonap.gov.gn/verify/${Math.random().toString(36).substring(7)}`,
+            system: 'SIHG-SONAP-CERTIFIED' 
         });
-        const qrB64 = await QRCode.toDataURL(qrData, { width: 100, margin: 1 });
-        const qrBuffer = await (await fetch(qrB64)).arrayBuffer();
+        const qrB64 = await QRCode.toDataURL(qrData, { 
+            width: 150, 
+            margin: 1,
+            color: { dark: '#1F2937', light: '#FFFFFF' }
+        });
+        const id = workbook.addImage({ base64: qrB64, extension: 'png' });
+        sheet.addImage(id, {
+            tl: { col: 1.2, row: currentY - 0.5 },
+            ext: { width: 100, height: 100 }
+        });
         
-        const qrId = workbook.addImage({
-            buffer: qrBuffer,
-            extension: 'png',
-        });
-        sheet.addImage(qrId, {
-            tl: { col: 1, row: bottomRowNum },
-            ext: { width: 70, height: 70 }
-        });
-    } catch (e) { console.error('QR Error:', e); }
+        sheet.getCell(currentY + 4, 2).value = "CERTIFIÉ PAR SIHG";
+        sheet.getCell(currentY + 4, 2).font = { size: 7, bold: true, color: { argb: 'FF9BA3AF' } };
+    } catch (e) { console.error('QR Error', e); }
 
-    const sig = ROLE_SIGNATURE[signerRole || 'directeur_general'] || ROLE_SIGNATURE['directeur_general'];
+    // Logic de Signature - Official Box on the right
+    const role = signerRole || 'directeur_general';
+    const sig = ROLE_SIGNATURE[role] || { droite: "SIGNATURE AUTORISÉE" };
     
-    const sigLineRow = bottomRowNum + 5;
+    // Position for Signature
+    const sigCol = lastColIndex - 1; 
     
-    // Uniquement la signature a droite
-    if (sig.droite) {
-        sheet.getCell(sigLineRow, headers.length).value = sig.droite;
-        sheet.getCell(sigLineRow, headers.length).font = { bold: true, size: 10 };
-        sheet.getCell(sigLineRow, headers.length).alignment = { horizontal: 'right' };
-        
-        // Simuler une ligne de signature
-        const borderRow = sigLineRow + 2;
-        sheet.getCell(borderRow, headers.length).border = { bottom: { style: 'medium' } };
-    }
+    const cellRight = sheet.getCell(currentY, sigCol + 1);
+    cellRight.value = sig.droite.toUpperCase();
+    cellRight.font = { bold: true, size: 10, name: 'Arial' };
+    cellRight.alignment = { horizontal: 'center' };
 
-    // Final Save
+    const nameRight = sheet.getCell(currentY + 1, sigCol + 1);
+    nameRight.value = signerName || "Responsable Autorisé";
+    nameRight.font = { italic: true, size: 9, name: 'Arial' };
+    nameRight.alignment = { horizontal: 'center' };
+
+    // Placeholder line for manual signature
+    const lineRow = currentY + 4;
+    const sigLineCell = sheet.getCell(lineRow, sigCol + 1);
+    sigLineCell.border = { bottom: { style: 'medium', color: { argb: 'FF000000' } } };
+    
+    // Add "Veuillez signer ci-dessus" text
+    const hintCell = sheet.getCell(lineRow + 1, sigCol + 1);
+    hintCell.value = "(Signature et Cachet)";
+    hintCell.font = { size: 8, italic: true, color: { argb: 'FF6B7280' } };
+    hintCell.alignment = { horizontal: 'center' };
+
+    const footerY = currentY + 8;
+    sheet.mergeCells(footerY, 2, footerY, lastColIndex);
+    const footerCell = sheet.getCell(footerY, 2);
+    footerCell.value = "Ce document est généré par le Système Intégré de Gestion des Hydrocarbures (SIHG).";
+    footerCell.font = { size: 8, italic: true, color: { argb: 'FF9BA3AF' } };
+    footerCell.alignment = { horizontal: 'center' };
+
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     saveAs(blob, filename.endsWith('.xlsx') ? filename : `${filename}.xlsx`);
