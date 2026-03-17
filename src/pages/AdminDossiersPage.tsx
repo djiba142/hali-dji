@@ -110,16 +110,32 @@ export default function AdminDossiersPage() {
 
   const handleUpdateStatus = async (id: string, newStatus: DossierStatus) => {
     try {
-      const updateData: any = { statut: newStatus, updated_at: new Date().toISOString() };
-      
-      // Assign validator based on role
-      if (role?.includes('aval')) updateData.valide_par_dsa = user?.id;
-      if (role?.includes('administratif')) updateData.valide_par_da = user?.id;
-      if (role?.includes('juridique')) updateData.valide_par_djc = user?.id;
-      
-      // Final validation by DG or equivalent
-      if (['directeur_general', 'directeur_adjoint', 'admin_etat', 'super_admin'].includes(role || '')) {
-        updateData.valide_par_dg = user?.id;
+      const isDSA = role?.includes('aval') || role?.includes('dsa') || role?.includes('distribution');
+      const isDA = role?.includes('administratif');
+      const isDJ = role?.includes('juridique');
+      const isDG = ['directeur_general', 'directeur_adjoint', 'super_admin'].includes(role || '');
+
+      const updateData: any = { 
+        statut: newStatus,
+        updated_at: new Date().toISOString()
+      };
+
+      // Traçabilité des signatures (Qui a validé quoi ?)
+      if (isDSA && selectedDossier?.statut === 'numerise') {
+        updateData.valide_par_dsa = user?.email;
+        updateData.date_validation_dsa = new Date().toISOString();
+      } 
+      if (isDA && selectedDossier?.statut === 'analyse_technique') {
+        updateData.valide_par_da = user?.email;
+        updateData.date_validation_da = new Date().toISOString();
+      }
+      if (isDJ && selectedDossier?.statut === 'analyse_administrative') {
+        updateData.valide_par_djc = user?.email;
+        updateData.date_validation_djc = new Date().toISOString();
+      }
+      if (isDG && selectedDossier?.statut === 'analyse_juridique') {
+        updateData.valide_par_dg = user?.email;
+        updateData.date_validation_dg = new Date().toISOString();
       }
 
       const { error } = await supabase
@@ -128,10 +144,13 @@ export default function AdminDossiersPage() {
         .eq('id', id);
 
       if (error) throw error;
-      toast.success(`Statut mis à jour : ${STATUS_LABELS[newStatus].label}`);
+      toast.success(`Dossier transféré : ${STATUS_LABELS[newStatus].label}`);
       fetchDossiers();
+      if (selectedDossier?.id === id) {
+        setSelectedDossier(prev => prev ? { ...prev, ...updateData } : null);
+      }
     } catch (error: any) {
-      toast.error("Erreur: " + error.message);
+      toast.error("Erreur mise à jour: " + error.message);
     }
   };
 
@@ -195,14 +214,23 @@ export default function AdminDossiersPage() {
             <Button variant="outline" className="h-11 rounded-xl bg-white gap-2 font-bold border-slate-200" onClick={fetchDossiers}>
               <Activity className={cn("h-4 w-4", loading && "animate-spin")} /> Rafraîchir
             </Button>
-            {['agent_administratif', 'chef_service_administratif', 'super_admin'].includes(role || '') && (
-              <Button 
-                onClick={() => setIsNewDialogOpen(true)}
-                className="h-11 rounded-xl bg-slate-900 hover:bg-black text-white gap-2 shadow-lg"
-              >
-                <Plus className="h-4 w-4" /> Enregistrer un Dossier
-              </Button>
-            )}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+              <div>
+                <h1 className="text-4xl font-black text-slate-900 tracking-tighter">GESTION DES DOSSIERS</h1>
+                <p className="text-slate-500 font-medium">Système SN-SONAP • Traçabilité de la chaine de décision</p>
+              </div>
+              <div className="flex items-center gap-3">
+                {/* Permissions élargies pour la création (Admin + DSA pour les ouvertures stations) */}
+                {(role?.includes('administratif') || role?.includes('aval') || role?.includes('dsa') || role === 'super_admin') && (
+                  <Button 
+                    className="bg-slate-900 text-white rounded-2xl h-14 px-8 font-black uppercase text-[10px] tracking-widest shadow-xl shadow-slate-900/20 group transition-all active:scale-95"
+                    onClick={() => setIsNewDialogOpen(true)}
+                  >
+                    <Plus className="mr-2 h-4 w-4 group-hover:rotate-90 transition-transform" /> Enregistrer un Dossier
+                  </Button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -450,25 +478,36 @@ export default function AdminDossiersPage() {
                       <div className="absolute left-1.5 top-0 bottom-0 w-[2px] bg-slate-800" />
                       
                       {[
-                        { label: 'Réception SONAP', key: 'recu', icon: FolderOpen, color: 'text-slate-400' },
-                        { label: 'Analyse DSA', key: 'valide_par_dsa', icon: Activity, color: 'text-indigo-400' },
-                        { label: 'Analyse Administrative', key: 'valide_par_da', icon: FileCheck, color: 'text-amber-400' },
-                        { label: 'Analyse Juridique/Legal', key: 'valide_par_djc', icon: Shield, color: 'text-purple-400' },
-                        { label: 'Décision FINALE (DG)', key: 'valide_par_dg', icon: CheckCircle2, color: 'text-emerald-400' }
+                        { label: 'Réception SONAP', key: 'recu', date: selectedDossier.date_soumission, icon: FolderOpen, color: 'text-slate-400' },
+                        { label: 'Analyse DSA', key: 'valide_par_dsa', date: (selectedDossier as any).date_validation_dsa, icon: Activity, color: 'text-indigo-400' },
+                        { label: 'Analyse Administrative', key: 'valide_par_da', date: (selectedDossier as any).date_validation_da, icon: FileCheck, color: 'text-amber-400' },
+                        { label: 'Analyse Juridique/Legal', key: 'valide_par_djc', date: (selectedDossier as any).date_validation_djc, icon: Shield, color: 'text-purple-400' },
+                        { label: 'Décision FINALE (DG)', key: 'valide_par_dg', date: (selectedDossier as any).date_validation_dg, icon: CheckCircle2, color: 'text-emerald-400' }
                       ].map((step, idx) => {
                         const isDone = step.key === 'recu' ? true : !!(selectedDossier as any)[step.key];
+                        const stepDate = step.date ? new Date(step.date).toLocaleDateString('fr-FR', {
+                          day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+                        }) : null;
+
                         return (
-                          <div key={idx} className="flex items-start gap-4 relative z-10">
+                          <div key={idx} className="flex items-start gap-4 relative z-10 group">
                             <div className={cn(
                               "h-3 w-3 rounded-full mt-1 border-2 border-slate-900 ring-2 ring-offset-2 ring-offset-slate-900 transition-all duration-500",
                               isDone ? "bg-white ring-white/50" : "bg-slate-700 ring-transparent"
                             )} />
                             <div className="flex flex-col">
-                              <span className={cn("text-[10px] font-black uppercase tracking-widest", isDone ? "text-white" : "text-slate-600")}>
-                                {step.label}
-                              </span>
-                              <span className="text-[9px] text-slate-500 font-medium">
-                                {isDone ? "Action validée et tracée" : "En attente de traitement"}
+                              <div className="flex items-center gap-2">
+                                <span className={cn("text-[10px] font-black uppercase tracking-widest", isDone ? "text-white" : "text-slate-600")}>
+                                  {step.label}
+                                </span>
+                                {isDone && (
+                                  <Badge className="bg-white/5 text-[7px] text-slate-400 border-none px-1 h-3 font-mono">
+                                    {stepDate}
+                                  </Badge>
+                                )}
+                              </div>
+                              <span className="text-[9px] text-slate-500 font-medium mt-0.5">
+                                {isDone ? `Action validée par ${(selectedDossier as any)[step.key] || 'Système'}` : "En attente de traitement"}
                               </span>
                             </div>
                           </div>
@@ -491,8 +530,8 @@ export default function AdminDossiersPage() {
                   
                   {/* Décision Hiérarchique SONAP */}
                   <div className="p-1 bg-slate-100 rounded-2xl flex flex-col gap-1">
-                    {/* Étape AVAL (DSA) */}
-                    {selectedDossier.statut === 'numerise' && role?.includes('aval') && (
+                    {/* Étape AVAL (DSA) - Détecte "aval", "dsa" ou "distribution" */}
+                    {selectedDossier.statut === 'numerise' && (role?.includes('aval') || role?.includes('dsa') || role?.includes('distribution')) && (
                       <Button 
                         className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl h-14 font-black uppercase text-[10px] tracking-widest shadow-xl shadow-indigo-600/20"
                         onClick={() => handleUpdateStatus(selectedDossier.id, 'analyse_technique')}

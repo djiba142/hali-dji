@@ -85,6 +85,10 @@ export interface Dossier {
   nif_url?: string;
   statuts_url?: string;
   autorisation_url?: string;
+  date_validation_dsa?: string;
+  date_validation_da?: string;
+  date_validation_djc?: string;
+  date_validation_dg?: string;
 }
 
 export type StationStatus = 
