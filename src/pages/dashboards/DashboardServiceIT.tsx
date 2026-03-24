@@ -166,20 +166,28 @@ export default function DashboardServiceIT() {
         { name: 'Realtime', status: 'operational', uptime: 99.5 },
     ];
 
-    const logs: SystemLog[] = auditLogs.map(log => {
+    const logs: SystemLog[] = (auditLogs || []).map((log: any) => {
       let level: 'info' | 'warning' | 'error' | 'success' = 'info';
-      const actionName = (log.action_type || log.action || '').toLowerCase();
+      const actionName = (log?.action_type || log?.action || '').toLowerCase();
       
-      if (actionName.includes('fail') || actionName.includes('error') || log.status === 'failed') level = 'error';
+      if (actionName.includes('fail') || actionName.includes('error') || log?.status === 'failed') level = 'error';
       else if (actionName.includes('warning') || actionName.includes('concurrent') || actionName.includes('delete')) level = 'warning';
       else level = 'success';
 
+      let formattedDate = '-';
+      try {
+        if (log?.created_at) {
+          const d = new Date(log.created_at);
+          formattedDate = isNaN(d.getTime()) ? '-' : d.toLocaleString('fr-FR');
+        }
+      } catch { formattedDate = '-'; }
+
       return {
-        id: log.id,
-        source: log.resource_type || log.module || 'System',
-        action: log.action_type || log.action || 'INCONNU',
-        user: log.user_email || (log.user_id ? log.user_id.substring(0,8) + '...' : 'System'),
-        timestamp: new Date(log.created_at).toLocaleString('fr-FR'),
+        id: log?.id || String(Math.random()),
+        source: log?.resource_type || log?.module || 'System',
+        action: log?.action_type || log?.action || 'INCONNU',
+        user: log?.user_email || (log?.user_id ? String(log.user_id).substring(0,8) + '...' : 'System'),
+        timestamp: formattedDate,
         level,
       };
     });
