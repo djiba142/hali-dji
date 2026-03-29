@@ -28,7 +28,10 @@ export default function AuthPage() {
     hasProfile, 
     hasRole, 
     loading: authLoading,
-    getDashboardRoute 
+    getDashboardRoute,
+    mfaSetupRequired,
+    mfaVerificationRequired,
+    refreshMfaStatus
   } = useAuth();
   const { toast } = useToast();
 
@@ -42,8 +45,13 @@ export default function AuthPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Auth view state
-  const [view, setView] = useState<'login' | 'forgot' | 'reset'>('login');
+  const [view, setView] = useState<'login' | 'forgot' | 'reset' | 'mfa-setup' | 'mfa-challenge'>('login');
   const [isSuccess, setIsSuccess] = useState(false);
+  const [mfaQrCode, setMfaQrCode] = useState<string | null>(null);
+  const [mfaSecret, setMfaSecret] = useState<string | null>(null);
+  const [mfaCode, setMfaCode] = useState('');
+  const [factorId, setFactorId] = useState<string | null>(null);
+  const [challengeId, setChallengeId] = useState<string | null>(null);
 
   const [searchParams] = useSearchParams();
   const reason = searchParams.get('reason');
@@ -59,16 +67,81 @@ export default function AuthPage() {
 
   useEffect(() => {
     // Redirection automatique si déjà connecté
-    if (user && !authLoading && view === 'login') {
+    if (user && !authLoading) {
       if (hasProfile && hasRole) {
-        const route = getEffectiveRedirect();
-        console.log('Utilisateur authentifié, redirection vers:', route);
-        navigate(route);
+        if (mfaSetupRequired) {
+          if (view !== 'mfa-setup') setView('mfa-setup');
+        } else if (mfaVerificationRequired) {
+          if (view !== 'mfa-challenge') setView('mfa-challenge');
+        } else {
+          const route = getEffectiveRedirect();
+          console.log('Utilisateur authentifié, redirection vers:', route);
+          navigate(route);
+        }
       } else {
         console.log('Utilisateur connecté mais sans profil/rôle complet.');
       }
     }
-  }, [user, hasProfile, hasRole, authLoading, navigate, view]);
+  }, [user, hasProfile, hasRole, authLoading, navigate, mfaSetupRequired, mfaVerificationRequired, view]);
+
+  // Handle MFA Enroll Generation
+  useEffect(() => {
+    if (view === 'mfa-setup' && !factorId) {
+      const enroll = async () => {
+        setLoading(true);
+        
+        // Nettoyage des facteurs non vérifiés (éviter l'erreur 422 au refresh)
+        try {
+          const { data: factors } = await supabase.auth.mfa.listFactors();
+          if (factors && factors.all) {
+            const unverified = factors.all.filter((f: any) => f.status === 'unverified' && f.factor_type === 'totp');
+            for (const f of unverified) {
+              await supabase.auth.mfa.unenroll({ factorId: f.id });
+            }
+          }
+        } catch (err) {
+          console.warn('Failed to cleanup unverified factors', err);
+        }
+
+        const { data, error } = await supabase.auth.mfa.enroll({ factorType: 'totp' });
+        if (error) {
+          toast({ variant: 'destructive', title: 'Erreur MFA', description: error.message });
+        } else if (data) {
+          setFactorId(data.id);
+          setMfaQrCode(data.totp.qr_code);
+          setMfaSecret(data.totp.secret);
+        }
+        setLoading(false);
+      };
+      enroll();
+    }
+  }, [view, factorId, toast]);
+
+  // Handle MFA Challenge Generation
+  useEffect(() => {
+    if (view === 'mfa-challenge' && !factorId) {
+      const getFactor = async () => {
+        setLoading(true);
+        const { data, error } = await supabase.auth.mfa.listFactors();
+        if (error) {
+          toast({ variant: 'destructive', title: 'Erreur MFA', description: error.message });
+        } else if (data) {
+          const totpFactor = data.all.find((f: any) => f.factor_type === 'totp' && f.status === 'verified');
+          if (totpFactor) {
+            setFactorId(totpFactor.id);
+            const challengeResponse = await supabase.auth.mfa.challenge({ factorId: totpFactor.id });
+            if (challengeResponse.error) {
+              toast({ variant: 'destructive', title: 'Erreur', description: challengeResponse.error.message });
+            } else if (challengeResponse.data) {
+              setChallengeId(challengeResponse.data.id);
+            }
+          }
+        }
+        setLoading(false);
+      };
+      getFactor();
+    }
+  }, [view, factorId, toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,6 +202,54 @@ export default function AuthPage() {
     }
   };
 
+  const handleVerifySetup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!factorId) return;
+    setLoading(true);
+    
+    const challengeRes = await supabase.auth.mfa.challenge({ factorId });
+    if (challengeRes.error) {
+       toast({ variant: 'destructive', title: 'Erreur', description: challengeRes.error.message });
+       setLoading(false);
+       return;
+    }
+    
+    const verifyRes = await supabase.auth.mfa.verify({
+      factorId,
+      challengeId: challengeRes.data.id,
+      code: mfaCode
+    });
+    
+    if (verifyRes.error) {
+       toast({ variant: 'destructive', title: 'Code Invalide', description: verifyRes.error.message });
+    } else {
+       toast({ title: 'MFA Activé', description: 'La double authentification est bien configurée.' });
+       await refreshMfaStatus();
+    }
+    setLoading(false);
+  };
+
+  const handleVerifyChallenge = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!factorId || !challengeId) return;
+    setLoading(true);
+    
+    const verifyRes = await supabase.auth.mfa.verify({
+      factorId,
+      challengeId,
+      code: mfaCode
+    });
+    
+    if (verifyRes.error) {
+       toast({ variant: 'destructive', title: 'Code Invalide', description: verifyRes.error.message });
+       const newChallenge = await supabase.auth.mfa.challenge({ factorId });
+       if (newChallenge.data) setChallengeId(newChallenge.data.id);
+    } else {
+       await refreshMfaStatus();
+    }
+    setLoading(false);
+  };
+
   // Only show "unauthorized" AFTER auth is fully loaded AND a grace period has passed
   // This prevents race conditions where profile/role aren't loaded yet
   const isUnauthorized = user && !authLoading && dataCheckReady && (!hasProfile || !hasRole);
@@ -163,7 +284,7 @@ export default function AuthPage() {
     }
   }, [isUnauthorized, user, hasProfile, hasRole, toast]);
 
-  if (user && (authLoading || (hasProfile && hasRole && view !== 'reset'))) {
+  if (user && (authLoading || (hasProfile && hasRole && view !== 'reset' && view !== 'mfa-setup' && view !== 'mfa-challenge'))) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-6">
@@ -204,6 +325,8 @@ export default function AuthPage() {
               {view === 'login' && 'Connexion'}
               {view === 'forgot' && 'Mot de passe oublié'}
               {view === 'reset' && 'Réinitialisation'}
+              {view === 'mfa-setup' && 'Sécurité Requise'}
+              {view === 'mfa-challenge' && 'Authentification MFA'}
             </h1>
             {reason === 'expired' && (
               <div className="mt-4 p-3 rounded-xl bg-orange-50 border border-orange-200 flex items-center gap-3 animate-in slide-in-from-top-2 duration-300">
@@ -213,11 +336,78 @@ export default function AuthPage() {
                 </p>
               </div>
             )}
+            {(view === 'mfa-setup' || view === 'mfa-challenge') && (
+              <p className="text-sm text-slate-500 mt-2">
+                Votre rôle autorise l'accès à des données critiques.
+              </p>
+            )}
           </div>
 
           {!isUnauthorized && !isSuccess ? (
             <>
-              {view === 'login' ? (
+              {view === 'mfa-setup' ? (
+                <form onSubmit={handleVerifySetup} className="space-y-6">
+                  <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                    <p className="text-sm text-slate-700 text-center mb-4 font-medium">
+                      1. Scannez ce QR Code avec Google Authenticator ou Authy.
+                    </p>
+                    {mfaQrCode ? (
+                      <div className="flex justify-center bg-white p-2 rounded-xl border border-slate-200 mb-4 overflow-hidden">
+                        <img src={mfaQrCode} alt="MFA QR Code" className="h-48 w-48 object-contain" />
+                      </div>
+                    ) : (
+                      <div className="h-48 w-48 flex justify-center items-center bg-slate-100 rounded-xl mx-auto mb-4 animate-pulse" />
+                    )}
+                    {mfaSecret && (
+                      <div className="text-center text-xs text-slate-500 mb-4">
+                        Code manuel : <span className="font-mono tracking-wider text-slate-800 font-bold">{mfaSecret}</span>
+                      </div>
+                    )}
+                    <p className="text-sm text-slate-700 text-center font-medium mt-6 mb-2">
+                      2. Saisissez le code à 6 chiffres généré.
+                    </p>
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={6}
+                      placeholder="000000"
+                      value={mfaCode}
+                      onChange={(e) => setMfaCode(e.target.value)}
+                      className="text-center tracking-[1em] font-mono text-lg h-12"
+                      required
+                    />
+                  </div>
+                  <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700" disabled={loading || mfaCode.length < 6}>
+                    {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Activer et Continuer'}
+                  </Button>
+                </form>
+
+              ) : view === 'mfa-challenge' ? (
+                <form onSubmit={handleVerifyChallenge} className="space-y-6">
+                  <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 text-center">
+                    <Lock className="h-10 w-10 text-emerald-600 mx-auto mb-4" />
+                    <p className="text-sm text-slate-700 mb-6 font-medium">
+                      Ouvrez votre application d'authentification et saisissez le code temporaire pour confirmer votre identité.
+                    </p>
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={6}
+                      placeholder="000000"
+                      value={mfaCode}
+                      onChange={(e) => setMfaCode(e.target.value)}
+                      className="text-center tracking-[1em] font-mono text-xl h-14"
+                      required
+                    />
+                  </div>
+                  <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 h-12" disabled={loading || mfaCode.length < 6}>
+                    {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Vérifier l\'identité'}
+                  </Button>
+                </form>
+
+              ) : view === 'login' ? (
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>

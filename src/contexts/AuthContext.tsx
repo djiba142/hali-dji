@@ -108,6 +108,9 @@ interface AuthContextType {
   canModifyData: boolean;
   canManageStations: boolean;
   canManageEntreprises: boolean;
+  mfaSetupRequired: boolean;
+  mfaVerificationRequired: boolean;
+  refreshMfaStatus: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -143,6 +146,9 @@ const ROLE_HIERARCHY: Record<AppRole, number> = {
 
 // Rôles avec accès en lecture seule (pas de modification de données métier)
 const READ_ONLY_ROLES: AppRole[] = ['inspecteur', 'agent_supervision_aval', 'technicien_support_dsa', 'secretaire_general', 'directeur_general', 'directeur_adjoint', 'service_it'];
+
+// Rôles nécessitant obligatoirement la double authentification (MFA)
+const MFA_REQUIRED_ROLES: AppRole[] = ['super_admin', 'service_it', 'directeur_general', 'admin_etat'];
 
 // Rôles pouvant gérer les utilisateurs
 const USER_MANAGEMENT_ROLES: AppRole[] = [
@@ -195,6 +201,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<AppRole | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSessionLocked, setIsSessionLocked] = useState(false);
+  const [mfaSetupRequired, setMfaSetupRequired] = useState(false);
+  const [mfaVerificationRequired, setMfaVerificationRequired] = useState(false);
   const inactivityTimer = useRef<NodeJS.Timeout | null>(null);
 
   // Prevent duplicate fetchUserData calls
@@ -249,9 +257,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.warn(`fetchUserData: No profile found for user ${userId}`);
       }
 
+      let fetchedRole: AppRole | null = null;
       if (roleResult.data) {
         console.log(`Rôle chargé pour ${userId}:`, roleResult.data.role);
-        setRole(roleResult.data.role as AppRole);
+        fetchedRole = roleResult.data.role as AppRole;
+        setRole(fetchedRole);
       } else {
         if (roleResult.error) console.error('Erreur lors du chargement du rôle:', roleResult.error.message);
         
@@ -264,13 +274,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         
         if (roleFallback && roleFallback.length > 0) {
           console.log(`Rôle chargé (fallback) pour ${userId}:`, roleFallback[0].role);
-          setRole(roleFallback[0].role as AppRole);
+          fetchedRole = roleFallback[0].role as AppRole;
+          setRole(fetchedRole);
         } else {
           if (fallbackError) console.error('Erreur fallback rôle:', fallbackError.message);
           console.warn(`Aucun rôle trouvé pour l'utilisateur ${userId}. Vérifiez la table user_roles.`);
           setRole(null);
         }
       }
+
+      // ==== VÉRIFICATION MFA ====
+      try {
+        const { data: aalData, error: aalError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+        const { data: factorsData, error: factorsError } = await supabase.auth.mfa.listFactors();
+        
+        if (!aalError && !factorsError && aalData && factorsData) {
+          const hasTotpFactor = factorsData.all.some((f: any) => f.factor_type === 'totp' && f.status === 'verified');
+          
+          if (aalData.nextLevel === 'aal2' && aalData.currentLevel === 'aal1') {
+            // L'utilisateur a un facteur MFA, mais ne l'a pas encore validé pour cette session
+            setMfaVerificationRequired(true);
+            setMfaSetupRequired(false);
+          } else if (fetchedRole && MFA_REQUIRED_ROLES.includes(fetchedRole as AppRole) && !hasTotpFactor) {
+            // L'utilisateur n'a pas de MFA mais son rôle l'exige
+            setMfaSetupRequired(true);
+            setMfaVerificationRequired(false);
+          } else {
+            // Pas de MFA requis ou vérifier avec succès
+            setMfaSetupRequired(false);
+            setMfaVerificationRequired(false);
+          }
+        }
+      } catch (e) {
+        console.error('Erreur lors de la vérification MFA:', e);
+      }
+
     } catch (error) {
       console.error('fetchUserData: Critical error:', error);
     } finally {
@@ -503,6 +541,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!role) return false;
     return ENTREPRISE_MANAGEMENT_ROLES.includes(role);
   }, [role]);
+
+  const refreshMfaStatus = useCallback(async () => {
+    if (!user) return;
+    try {
+      const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      const { data: factorsData } = await supabase.auth.mfa.listFactors();
+      
+      if (aalData && factorsData) {
+        const hasTotpFactor = factorsData.all.some((f: any) => f.factor_type === 'totp' && f.status === 'verified');
+        
+        if (aalData.nextLevel === 'aal2' && aalData.currentLevel === 'aal1') {
+          setMfaVerificationRequired(true);
+          setMfaSetupRequired(false);
+        } else if (role && MFA_REQUIRED_ROLES.includes(role) && !hasTotpFactor) {
+          setMfaSetupRequired(true);
+          setMfaVerificationRequired(false);
+        } else {
+          setMfaSetupRequired(false);
+          setMfaVerificationRequired(false);
+        }
+      }
+    } catch (error) {
+      console.error('Error refreshing MFA status:', error);
+    }
+  }, [user, role]);
 
   /**
    * CREATE USER: 
@@ -742,6 +805,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     canModifyData,
     canManageStations,
     canManageEntreprises,
+    mfaSetupRequired,
+    mfaVerificationRequired,
+    refreshMfaStatus,
   }), [
     user, session, profile, role, loading, hasProfile, hasRole,
     signIn, signUp, signOut, isSessionLocked, unlockSession,
@@ -749,6 +815,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     updateUser, deleteUser, resetPasswordForEmail, updatePassword,
     getDashboardRoute, isReadOnly, canManageUsers, canAddObservation, canModifyData,
     canManageStations, canManageEntreprises,
+    mfaSetupRequired, mfaVerificationRequired, refreshMfaStatus,
   ]);
 
   return (

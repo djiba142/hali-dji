@@ -8,7 +8,7 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
-  const { user, loading, canAccess } = useAuth();
+  const { user, loading, canAccess, mfaSetupRequired, mfaVerificationRequired } = useAuth();
 
   if (loading) {
     return (
@@ -32,6 +32,15 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
 
   if (requiredRole && !canAccess(requiredRole)) {
     return <Navigate to="/acces-refuse" replace />;
+  }
+
+  // ==== BLOCAGE MFA ====
+  if (mfaSetupRequired) {
+    return <Navigate to="/auth?mfa=setup" replace />;
+  }
+
+  if (mfaVerificationRequired) {
+    return <Navigate to="/auth?mfa=verify" replace />;
   }
 
   return <>{children}</>;
