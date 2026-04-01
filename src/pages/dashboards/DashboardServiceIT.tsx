@@ -47,6 +47,7 @@ interface SystemLog {
 export default function DashboardServiceIT() {
     const [users, setUsers] = useState<UserProfile[]>([]);
     const [userRoles, setUserRoles] = useState<UserRoleRow[]>([]);
+    const [auditLogs, setAuditLogs] = useState<SystemLog[]>([]);
     const [loading, setLoading] = useState(true);
     const [isSavingConfig, setIsSavingConfig] = useState(false);
     const [isBackingUp, setIsBackingUp] = useState(false);
@@ -55,15 +56,30 @@ export default function DashboardServiceIT() {
     const fetchData = useCallback(async () => {
         setLoading(true);
         try {
-            const [usersRes, rolesRes, stationsRes] = await Promise.all([
+            const [usersRes, rolesRes, stationsRes, logsRes] = await Promise.all([
                 supabase.from('profiles').select('*').order('created_at', { ascending: false }),
                 supabase.from('user_roles').select('*'),
-                supabase.from('stations').select('*, entreprise:entreprises(nom)').eq('statut', 'attente_dsi')
+                supabase.from('stations').select('*, entreprise:entreprises(nom)').eq('statut', 'attente_dsi'),
+                supabase.from('audit_logs' as any).select('*').order('created_at', { ascending: false }).limit(20)
             ]);
 
             setUsers((usersRes.data || []) as UserProfile[]);
             setUserRoles((rolesRes.data || []) as UserRoleRow[]);
             setPendingStations(stationsRes.data || []);
+            
+            const rawLogs = logsRes.data || [];
+            const formattedLogs: SystemLog[] = rawLogs.map((log: any) => ({
+                id: log.id,
+                source: log.resource_type || 'Système',
+                action: `${log.action_type || 'ACTION'}: ${log.resource_name || ''}`.trim(),
+                user: log.user_email || log.user_id || 'Inconnu',
+                timestamp: new Date(log.created_at).toLocaleString('fr-FR', {
+                    day: '2-digit', month: '2-digit', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit'
+                }),
+                level: log.action_type === 'DELETE' ? 'error' : (log.action_type === 'UPDATE' ? 'warning' : 'info')
+            }));
+            setAuditLogs(formattedLogs);
         } catch (error) {
             console.error('Error:', error);
         } finally {
@@ -162,13 +178,7 @@ export default function DashboardServiceIT() {
         { name: 'Realtime', status: 'operational', uptime: 99.5 },
     ];
 
-    const logs: SystemLog[] = [
-        { id: '1', source: 'Auth', action: 'Connexion réussie', user: 'm.sylla@sihg.gov.gn', timestamp: 'Il y a 2 min', level: 'success' },
-        { id: '2', source: 'Database', action: 'Update station stock', user: 'System Worker #4', timestamp: 'Il y a 5 min', level: 'info' },
-        { id: '3', source: 'Network', action: 'IoT Gateway Timeout', user: 'Gateway-Kindia-2', timestamp: 'Il y a 12 min', level: 'warning' },
-        { id: '4', source: 'Security', action: 'Tentative de modification non autorisée', user: '192.168.1.45', timestamp: 'Il y a 1h', level: 'error' },
-        { id: '5', source: 'System', action: 'Backup quotidien complété', user: 'CronJob', timestamp: 'Il y a 4h', level: 'success' },
-    ];
+    // L'état `auditLogs` remplace l'ancienne constante statique `logs`.
 
     const roleLabels = ROLE_LABELS;
 
@@ -509,10 +519,13 @@ export default function DashboardServiceIT() {
                             </div>
                         </CardHeader>
                         <CardContent className="p-0 bg-slate-950 font-mono text-[12px]">
-                            <div className="divide-y divide-slate-900">
-                                {logs.map(log => (
+                            <div className="divide-y divide-slate-900 overflow-auto max-h-[350px]">
+                                {auditLogs.length === 0 && (
+                                    <div className="p-6 text-center text-slate-500 italic">Aucun log trouvé</div>
+                                )}
+                                {auditLogs.map(log => (
                                     <div key={log.id} className="flex items-center gap-4 px-6 py-3 hover:bg-slate-900/50 transition-colors">
-                                        <span className="text-slate-500 min-w-[80px]">{log.timestamp}</span>
+                                        <span className="text-slate-500 min-w-[120px]">{log.timestamp}</span>
                                         <Badge className={cn("h-5 min-w-[80px] justify-center text-[10px]",
                                             log.level === 'error' ? 'bg-red-500/20 text-red-400 border-red-500/30' :
                                                 log.level === 'warning' ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' :
@@ -520,8 +533,8 @@ export default function DashboardServiceIT() {
                                         )} variant="outline">
                                             {log.source.toUpperCase()}
                                         </Badge>
-                                        <span className="text-slate-300 flex-1">{log.action}</span>
-                                        <span className="text-slate-500 italic text-[10px]">{log.user}</span>
+                                        <span className="text-slate-300 flex-1 truncate">{log.action}</span>
+                                        <span className="text-slate-500 italic text-[10px] min-w-[150px] truncate" title={log.user}>{log.user}</span>
                                     </div>
                                 ))}
                             </div>

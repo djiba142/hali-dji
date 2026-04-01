@@ -55,6 +55,7 @@ export default function AuthPage() {
 
   const [searchParams] = useSearchParams();
   const reason = searchParams.get('reason');
+  const errorParam = searchParams.get('error');
 
   const getEffectiveRedirect = () => {
     const savedRedirect = sessionStorage.getItem('redirectAfterLogin');
@@ -333,6 +334,14 @@ export default function AuthPage() {
                 <ShieldAlert className="h-5 w-5 text-orange-600 shrink-0" />
                 <p className="text-xs text-orange-800 font-medium text-left">
                   Votre session a expiré pour inactivité. Veuillez vous identifier pour continuer vos travaux.
+                </p>
+              </div>
+            )}
+            {errorParam === 'session_conflict' && (
+              <div className="mt-4 p-3 rounded-xl bg-red-50 border border-red-200 flex items-center gap-3 animate-in slide-in-from-top-2 duration-300">
+                <ShieldAlert className="h-5 w-5 text-red-600 shrink-0" />
+                <p className="text-xs text-red-800 font-medium text-left">
+                  Déconnexion de sécurité : Ce compte vient d'être connecté sur un autre appareil.
                 </p>
               </div>
             )}

@@ -222,6 +222,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     console.log(`fetchUserData: starting fetch for ${userId}`);
     fetchingRef.current = true;
     lastFetchedUserId.current = userId;
+    setLoading(true);
 
     try {
       const [profileResult, roleResult] = await Promise.all([
@@ -245,7 +246,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const localDeviceId = localStorage.getItem('sihg_device_id');
         
         // Vérification de collision de session
-        if (profileData.active_device_id && localDeviceId && profileData.active_device_id !== localDeviceId) {
+        // Bypass si c'est une nouvelle connexion (la BDD n'est pas encore à jour)
+        const isSigningIn = sessionStorage.getItem('is_signing_in') === 'true';
+        if (!isSigningIn && profileData.active_device_id && localDeviceId && profileData.active_device_id !== localDeviceId) {
           console.warn('Session conflict detected on load. Signing out.');
           await supabase.auth.signOut();
           window.location.href = '/auth?error=session_conflict';
@@ -424,8 +427,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user?.email, resetInactivityTimer]);
 
   const signIn = useCallback(async (email: string, password: string) => {
+    sessionStorage.setItem('is_signing_in', 'true');
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
+      sessionStorage.removeItem('is_signing_in');
       // Log failed login attempt
       try {
         await (supabase as any).from('audit_logs').insert([{
@@ -448,6 +453,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .eq('user_id', data.user.id);
       } catch (err) {
         console.error('Failed to set active_device_id', err);
+      } finally {
+        sessionStorage.removeItem('is_signing_in');
       }
     }
     return { error };

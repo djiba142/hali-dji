@@ -41,6 +41,14 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 
+// Utility for Data Masking
+const maskEmail = (email: string) => {
+  if (!email || !email.includes('@')) return email;
+  const [local, domain] = email.split('@');
+  if (local.length <= 2) return `${local}***@${domain}`;
+  return `${local.substring(0, 2)}***${local.slice(-1)}@${domain}`;
+};
+
 interface UserWithDetails {
   id: string;
   user_id: string;
@@ -501,7 +509,11 @@ export default function UtilisateursPage() {
                           {user.role ? ROLE_LABELS[user.role] : 'Non défini'}
                         </Badge>
                         <span className="text-slate-300 dark:text-slate-700">•</span>
-                        <p className="text-xs text-slate-500 font-medium truncate">{user.email}</p>
+                        <p className="text-xs text-slate-500 font-medium truncate" title={user.email}>
+                          {(currentUserRole === 'super_admin' || currentUserRole === 'service_it' || user.user_id === currentUserProfile?.user_id) 
+                            ? user.email 
+                            : maskEmail(user.email)}
+                        </p>
                       </div>
                     </div>
 
