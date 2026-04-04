@@ -741,30 +741,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   /**
    * DELETE USER:
-   * Deletes the user's profile and role from the database.
-   * Note: Cannot delete auth.users from client-side; only profile + role are removed.
+   * Calls the 'delete-user' Edge Function which uses the service role key
+   * to fully remove the user from auth.users (and cascade to profiles/user_roles).
    */
   const deleteUser = useCallback(async (userId: string): Promise<{ error: Error | null }> => {
     if (!canManageUsers) return { error: new Error('Permissions insuffisantes') };
 
     try {
-      // Delete role first (no FK constraint issues)
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .delete()
-        .eq('user_id', userId);
+      const { data, error } = await supabase.functions.invoke('delete-user', {
+        body: { userId },
+      });
 
-      if (roleError) {
-        console.warn('Error deleting user role:', roleError);
-      }
-
-      // Delete profile
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('user_id', userId);
-
-      if (profileError) throw profileError;
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
       return { error: null };
     } catch (error) {
