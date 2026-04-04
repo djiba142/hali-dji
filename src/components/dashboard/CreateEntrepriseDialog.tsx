@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Upload, Building2 } from 'lucide-react';
+import { REGIONS } from '@/lib/constants';
 
 interface CreateEntrepriseDialogProps {
   open: boolean;
@@ -175,8 +176,9 @@ export function CreateEntrepriseDialog({ open, onOpenChange, onSuccess }: Create
                   <SelectValue placeholder="Sélectionner..." />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="compagnie">Compagnie</SelectItem>
+                  <SelectItem value="distributeur">Distributeur</SelectItem>
                   <SelectItem value="OMAP">OMAP (Marketter)</SelectItem>
-                  <SelectItem value="DISTRIBUTEUR">Distributeur</SelectItem>
                   <SelectItem value="TRANSPORTATEUR">Transporteur</SelectItem>
                   <SelectItem value="STOCKAGE">Stockage</SelectItem>
                 </SelectContent>
@@ -200,14 +202,9 @@ export function CreateEntrepriseDialog({ open, onOpenChange, onSuccess }: Create
                   <SelectValue placeholder="Sélectionner..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Conakry">Conakry</SelectItem>
-                  <SelectItem value="Kindia">Kindia</SelectItem>
-                  <SelectItem value="Boké">Boké</SelectItem>
-                  <SelectItem value="Mamou">Mamou</SelectItem>
-                  <SelectItem value="Faranah">Faranah</SelectItem>
-                  <SelectItem value="Kankan">Kankan</SelectItem>
-                  <SelectItem value="Labé">Labé</SelectItem>
-                  <SelectItem value="Nzérékoré">Nzérékoré</SelectItem>
+                  {REGIONS.map(r => (
+                    <SelectItem key={r} value={r}>{r}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -241,6 +238,13 @@ export function CreateEntrepriseDialog({ open, onOpenChange, onSuccess }: Create
                     placeholder="Téléphone" 
                     value={formData.contactTelephone}
                     onChange={(e) => setFormData({ ...formData, contactTelephone: e.target.value })}
+                    className="mb-2"
+                />
+                <Input 
+                    placeholder="Email" 
+                    type="email"
+                    value={formData.contactEmail}
+                    onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })}
                 />
             </div>
           </div>

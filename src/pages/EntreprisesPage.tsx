@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Search, Plus, Loader2, Upload } from 'lucide-react';
+import { Search, Plus, Loader2 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { EntrepriseCard } from '@/components/entreprises/EntrepriseCard';
 import { REGIONS } from '@/lib/constants';
@@ -19,15 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
+import { CreateEntrepriseDialog } from '@/components/dashboard/CreateEntrepriseDialog';
 import type { Entreprise } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -40,9 +32,6 @@ export default function EntreprisesPage() {
   const [selectedRegion, setSelectedRegion] = useState<string>('all');
   const [selectedType, setSelectedType] = useState<string>('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [logoFile, setLogoFile] = useState<File | null>(null);
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
@@ -54,26 +43,6 @@ export default function EntreprisesPage() {
       setSearchParams(newParams, { replace: true });
     }
   }, [searchParams, setSearchParams]);
-
-  const [formData, setFormData] = useState<{
-    nom: string;
-    sigle: string;
-    type: 'compagnie' | 'distributeur' | '';
-    numeroAgrement: string;
-    region: string;
-    contactNom: string;
-    contactTelephone: string;
-    contactEmail: string;
-  }>({
-    nom: '',
-    sigle: '',
-    type: '',
-    numeroAgrement: '',
-    region: '',
-    contactNom: '',
-    contactTelephone: '',
-    contactEmail: '',
-  });
 
   const localLogoMapping: Record<string, string> = {
     'TOTAL': logoTotal,
@@ -174,117 +143,6 @@ export default function EntreprisesPage() {
     return matchesSearch && matchesRegion && matchesType;
   });
 
-  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        toast({
-          variant: 'destructive',
-          title: 'Fichier trop volumineux',
-          description: 'La taille maximale est de 2 Mo.',
-        });
-        return;
-      }
-      setLogoFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => setLogoPreview(reader.result as string);
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const uploadLogo = async (file: File): Promise<string | null> => {
-    try {
-      const fileExt = file.name.split('.').pop() || 'png';
-      const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
-      const filePath = `${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('logos')
-        .upload(filePath, file, {
-          upsert: false,
-          contentType: file.type,
-        });
-
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage.from('logos').getPublicUrl(filePath);
-      return urlData.publicUrl;
-    } catch (err) {
-      console.error('Erreur upload logo:', err);
-      toast({
-        variant: 'destructive',
-        title: 'Erreur upload',
-        description: err instanceof Error ? err.message : 'Impossible de télécharger le logo.',
-      });
-      return null;
-    }
-  };
-
-  const handleSaveEntreprise = async () => {
-    if (!formData.nom.trim() || !formData.sigle.trim() || !formData.type || !formData.region) {
-      toast({
-        variant: 'destructive',
-        title: 'Champs obligatoires manquants',
-        description: 'Nom, sigle, type et région sont requis.',
-      });
-      return;
-    }
-
-    setSaving(true);
-
-    try {
-      let logoUrl: string | null = null;
-      if (logoFile) {
-        logoUrl = await uploadLogo(logoFile);
-      }
-
-      const numeroAgrement = formData.numeroAgrement.trim() || `AGR-${Date.now()}`;
-
-      const { error } = await supabase.from('entreprises').insert({
-        nom: formData.nom.trim(),
-        sigle: formData.sigle.trim(),
-        type: formData.type,
-        numero_agrement: numeroAgrement,
-        region: formData.region,
-        statut: 'actif',
-        logo_url: logoUrl,
-        contact_nom: formData.contactNom.trim() || null,
-        contact_telephone: formData.contactTelephone.trim() || null,
-        contact_email: formData.contactEmail.trim() || null,
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: 'Succès',
-        description: `${formData.nom} a été créée avec succès.`,
-      });
-
-      setFormData({
-        nom: '',
-        sigle: '',
-        type: '',
-        numeroAgrement: '',
-        region: '',
-        contactNom: '',
-        contactTelephone: '',
-        contactEmail: '',
-      });
-      setLogoFile(null);
-      setLogoPreview(null);
-      setIsDialogOpen(false);
-      await fetchEntreprises();
-    } catch (err: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Erreur',
-        description: err.message || 'Impossible d’enregistrer l’entreprise.',
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
   return (
     <DashboardLayout
       title="Entreprises"
@@ -376,163 +234,12 @@ export default function EntreprisesPage() {
         </div>
       )}
 
-      {/* Dialog création - avec scroll et footer sticky */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-hidden flex flex-col p-0">
-          <DialogHeader className="px-6 pt-6 pb-4 border-b">
-            <DialogTitle>Nouvelle entreprise</DialogTitle>
-            <DialogDescription>
-              Renseignez les informations principales de l’entreprise.
-            </DialogDescription>
-          </DialogHeader>
-
-          {/* Zone scrollable */}
-          <div className="flex-1 overflow-y-auto px-6 py-5">
-            <div className="space-y-5">
-              {/* Logo */}
-              <div className="space-y-2">
-                <Label>Logo (optionnel)</Label>
-                <div className="flex items-center gap-4">
-                  <div className="h-20 w-20 rounded-lg border overflow-hidden bg-muted flex items-center justify-center">
-                    {logoPreview ? (
-                      <img src={logoPreview} alt="Prévisualisation" className="h-full w-full object-cover" />
-                    ) : (
-                      <Upload className="h-8 w-8 text-muted-foreground" />
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <Input
-                      type="file"
-                      accept="image/png,image/jpeg,image/gif"
-                      onChange={handleLogoChange}
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      PNG, JPG ou GIF – max 2 Mo
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Nom */}
-              <div className="space-y-2">
-                <Label>Nom *</Label>
-                <Input
-                  value={formData.nom}
-                  onChange={e => setFormData({ ...formData, nom: e.target.value })}
-                  placeholder="Ex: TotalEnergies Guinée"
-                />
-              </div>
-
-              {/* Sigle */}
-              <div className="space-y-2">
-                <Label>Sigle *</Label>
-                <Input
-                  value={formData.sigle}
-                  onChange={e => setFormData({ ...formData, sigle: e.target.value })}
-                  placeholder="Ex: TOTAL"
-                />
-              </div>
-
-              {/* Type + Région */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Type *</Label>
-                  <Select
-                    value={formData.type}
-                    onValueChange={(v: 'compagnie' | 'distributeur') =>
-                      setFormData({ ...formData, type: v })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="compagnie">Compagnie</SelectItem>
-                      <SelectItem value="distributeur">Distributeur</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Région *</Label>
-                  <Select
-                    value={formData.region}
-                    onValueChange={v => setFormData({ ...formData, region: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {REGIONS.map(r => (
-                        <SelectItem key={r} value={r}>{r}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* Agrément */}
-              <div className="space-y-2">
-                <Label>N° agrément</Label>
-                <Input
-                  value={formData.numeroAgrement}
-                  onChange={e => setFormData({ ...formData, numeroAgrement: e.target.value })}
-                  placeholder="Ex: AGR-2026-001"
-                />
-              </div>
-
-              {/* Contact */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Contact</Label>
-                  <Input
-                    value={formData.contactNom}
-                    onChange={e => setFormData({ ...formData, contactNom: e.target.value })}
-                    placeholder="Nom complet"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Téléphone</Label>
-                  <Input
-                    value={formData.contactTelephone}
-                    onChange={e => setFormData({ ...formData, contactTelephone: e.target.value })}
-                    placeholder="+224 6XX XX XX XX"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Email</Label>
-                <Input
-                  type="email"
-                  value={formData.contactEmail}
-                  onChange={e => setFormData({ ...formData, contactEmail: e.target.value })}
-                  placeholder="contact@entreprise.gn"
-                />
-              </div>
-
-            </div>
-          </div>
-
-          {/* Footer sticky */}
-          <DialogFooter className="sticky bottom-0 bg-background px-6 py-4 border-t mt-auto">
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-              Annuler
-            </Button>
-            <Button
-              onClick={handleSaveEntreprise}
-              disabled={saving}
-            >
-              {saving ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Enregistrement...
-                </>
-              ) : 'Créer'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Dialog création partagé */}
+      <CreateEntrepriseDialog 
+        open={isDialogOpen} 
+        onOpenChange={setIsDialogOpen} 
+        onSuccess={fetchEntreprises}
+      />
     </DashboardLayout>
   );
 }

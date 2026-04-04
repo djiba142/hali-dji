@@ -29,7 +29,7 @@ export default function ImportQualityControlPage() {
     setLoading(true);
     try {
       // Fetch targaisons that are at the port ('arrive') or already inspected ('conforme', 'non_conforme')
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('import_cargaisons')
         .select(`
           *,
@@ -51,7 +51,7 @@ export default function ImportQualityControlPage() {
       
       // Initialize forms for new
       const currentForms = { ...forms };
-      (data || []).forEach((c) => {
+      (data || []).forEach((c: any) => {
         if (!currentForms[c.id]) {
           currentForms[c.id] = {
             quantity_verified: c.quantite_reelle ? c.quantite_reelle.toString() : '',
@@ -91,7 +91,7 @@ export default function ImportQualityControlPage() {
     setActionLoading(cargaisonId);
     try {
       // 1. Insert into quality_controls log
-      const { error: logError } = await supabase.from('quality_controls').insert({
+      const { error: logError } = await (supabase as any).from('quality_controls').insert({
         cargaison_id: cargaisonId,
         inspector_id: user?.id,
         is_compliant: isCompliant,
@@ -104,13 +104,22 @@ export default function ImportQualityControlPage() {
 
       // 2. Update cargaison status
       const newStatut = isCompliant ? 'conforme' : 'non_conforme';
-      const { error: updateError } = await supabase.from('import_cargaisons')
+      const { data: cargaisonData, error: updateError } = await (supabase as any).from('import_cargaisons')
         .update({ statut: newStatut })
-        .eq('id', cargaisonId);
+        .eq('id', cargaisonId)
+        .select('dossier_id')
+        .single();
 
       if (updateError) throw updateError;
 
-      toast.success(isCompliant ? "Cargaison déclarée Conforme." : "Cargaison bloquée pour Non-Conformité.");
+      // 3. Update associated dossier status to move it in the workflow
+      if (isCompliant && cargaisonData?.dossier_id) {
+        await (supabase as any).from('import_dossiers')
+          .update({ statut: 'au_port' })
+          .eq('id', cargaisonData.dossier_id);
+      }
+
+      toast.success(isCompliant ? "Cargaison déclarée Conforme. Dossier transmis à la Logistique." : "Cargaison bloquée pour Non-Conformité.");
       fetchData(); // Refresh list
     } catch (error: any) {
       console.error(error);
@@ -168,6 +177,7 @@ export default function ImportQualityControlPage() {
         ) : (
           cargaisons.map((c) => (
             <Card key={c.id} className="border-none shadow-md overflow-hidden relative">
+              <CardContent className="p-0">
               {c.statut === 'non_conforme' && (
                 <div className="absolute top-0 right-0 left-0 h-1 bg-red-500"></div>
               )}
@@ -237,7 +247,7 @@ export default function ImportQualityControlPage() {
                        </div>
                        
                        <div className="mb-6">
-                          <label className="text-xs font-bold text-slate-700 mb-1 block">Observations & Remarques</label>
+                          <label className="text-xs font-bold text-slate-700 mb-1 block">Observations &amp; Remarques</label>
                           <Textarea 
                             placeholder="Détails sur la température, densité, etc..."
                             value={forms[c.id]?.comments || ''}
@@ -277,9 +287,10 @@ export default function ImportQualityControlPage() {
                   )}
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
     </DashboardLayout>
   );

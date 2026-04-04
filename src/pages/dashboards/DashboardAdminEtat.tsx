@@ -46,6 +46,7 @@ import { CreateEntrepriseDialog } from '../../components/dashboard/CreateEntrepr
 import { CreateStationDialog } from '../../components/dashboard/CreateStationDialog';
 import { SecurityAuditCard } from '@/components/dashboard/SecurityAuditCard';
 import { ShieldAlert as ShieldIcon } from 'lucide-react';
+import { AvisDGDialog } from '@/components/dashboard/AvisDGDialog';
 
 interface AdminStats {
     totalEntreprises: number;
@@ -73,6 +74,8 @@ export default function DashboardAdminEtat() {
     const [activeTab, setActiveTab] = useState('overview');
     const [isCreateEntrepriseOpen, setIsCreateEntrepriseOpen] = useState(false);
     const [isCreateStationOpen, setIsCreateStationOpen] = useState(false);
+    const [isAvisDDialogOpen, setIsAvisDDialogOpen] = useState(false);
+    const [selectedDossier, setSelectedDossier] = useState<{ id: string, numero: string } | null>(null);
 
     const CONSOMMATION_JOURNALIERE = {
         essence: 800000,
@@ -161,9 +164,17 @@ export default function DashboardAdminEtat() {
     }, [fetchData]);
 
     const handleDossierAction = async (dossierId: string, action: 'avis' | 'rejeter') => {
+        if (action === 'avis') {
+            const dossier = dossiersSIHG.find(d => d.id === dossierId);
+            if(dossier) {
+                setSelectedDossier({ id: dossier.id, numero: dossier.numero_dossier });
+                setIsAvisDDialogOpen(true);
+            }
+            return;
+        }
+
         let nextStatut: string = '';
-        if (action === 'avis') nextStatut = 'avis_dg';
-        else if (action === 'rejeter') nextStatut = 'rejete';
+        if (action === 'rejeter') nextStatut = 'rejete';
 
         try {
             const { error } = await (supabase as any)
@@ -557,6 +568,14 @@ export default function DashboardAdminEtat() {
             <CreateStationDialog 
                 open={isCreateStationOpen} 
                 onOpenChange={setIsCreateStationOpen} 
+                onSuccess={fetchData}
+            />
+
+            <AvisDGDialog
+                open={isAvisDDialogOpen}
+                onOpenChange={setIsAvisDDialogOpen}
+                dossierId={selectedDossier?.id || ''}
+                dossierNumero={selectedDossier?.numero || ''}
                 onSuccess={fetchData}
             />
         </DashboardLayout>

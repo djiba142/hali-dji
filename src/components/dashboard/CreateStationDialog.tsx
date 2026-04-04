@@ -89,8 +89,8 @@ export function CreateStationDialog({ open, onOpenChange, onSuccess }: CreateSta
         capacite_lubrifiants: Number(formData.capacite_lubrifiants) || 0,
         nombre_cuves: Number(formData.nombre_cuves) || 2,
         nombre_pompes: Number(formData.nombre_pompes) || 4,
-        latitude: formData.latitude,
-        longitude: formData.longitude,
+        latitude: Number(formData.latitude),
+        longitude: Number(formData.longitude),
         stock_essence: 0,
         stock_gasoil: 0,
         stock_gpl: 0,
@@ -222,6 +222,27 @@ export function CreateStationDialog({ open, onOpenChange, onSuccess }: CreateSta
                 onChange={(e) => setFormData({ ...formData, adresse: e.target.value })}
               />
             </div>
+
+            <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Latitude (GPS)</Label>
+                    <Input 
+                        type="number"
+                        step="0.000001"
+                        value={formData.latitude}
+                        onChange={(e) => setFormData({ ...formData, latitude: Number(e.target.value) })}
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Longitude (GPS)</Label>
+                    <Input 
+                        type="number"
+                        step="0.000001"
+                        value={formData.longitude}
+                        onChange={(e) => setFormData({ ...formData, longitude: Number(e.target.value) })}
+                    />
+                </div>
+            </div>
           </div>
 
           {/* Capacités Techniques */}
@@ -243,6 +264,22 @@ export function CreateStationDialog({ open, onOpenChange, onSuccess }: CreateSta
                         type="number"
                         value={formData.capacite_gasoil}
                         onChange={(e) => setFormData({ ...formData, capacite_gasoil: Number(e.target.value) })}
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Capacité GPL (L)</Label>
+                    <Input 
+                        type="number"
+                        value={formData.capacite_gpl}
+                        onChange={(e) => setFormData({ ...formData, capacite_gpl: Number(e.target.value) })}
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Capacité Lubrif. (L)</Label>
+                    <Input 
+                        type="number"
+                        value={formData.capacite_lubrifiants}
+                        onChange={(e) => setFormData({ ...formData, capacite_lubrifiants: Number(e.target.value) })}
                     />
                 </div>
                 <div className="space-y-2">

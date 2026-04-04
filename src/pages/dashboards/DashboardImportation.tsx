@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { 
   Ship, Anchor, FolderOpen, TrendingUp, Clock, AlertCircle, 
@@ -21,15 +21,17 @@ export default function DashboardImportation() {
   const { role } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data: stats } = useQuery({
     queryKey: ['import-stats'],
     queryFn: async () => {
-      const { data: dossiers } = await (supabase as any).from('import_dossiers').select('*').order('created_at', { ascending: false });
+      // Use the 'importations' view to get standardized data across the board
+      const { data: dossiers } = await (supabase as any).from('importations').select('*').order('created_at', { ascending: false });
       const { count: navires } = await (supabase as any).from('import_navires').select('*', { count: 'exact', head: true });
       
-      const active = dossiers?.filter((d: any) => d.statut !== 'cloture').length || 0;
-      const transit = dossiers?.filter((d: any) => d.statut === 'en_transit').length || 0;
-      const totalVolume = dossiers?.reduce((acc: number, d: any) => acc + Number(d.quantite_prevue || 0), 0) || 0;
+      const active = dossiers?.filter((d: any) => d.statut !== 'termine' && d.statut !== 'cloture').length || 0;
+      const transit = dossiers?.filter((d: any) => d.statut === 'en_transit' || d.statut === 'transit').length || 0;
+      const totalVolume = dossiers?.reduce((acc: number, d: any) => acc + Number(d.quantite_tonnes || 0), 0) || 0;
 
       return { active, transit, totalVolume, navires, dossiers };
     }
@@ -47,8 +49,7 @@ export default function DashboardImportation() {
       if (error) throw error;
 
       toast({ title: "Dossier Transmis", description: "La Direction Juridique a été notifiée." });
-      // Refetch stats to update UI
-      window.location.reload(); 
+      queryClient.invalidateQueries({ queryKey: ['import-stats'] });
     } catch (error: any) {
        toast({ variant: "destructive", title: "Erreur", description: error.message || "Échec de la transmission." });
     }
@@ -66,7 +67,7 @@ export default function DashboardImportation() {
       if (error) throw error;
 
       toast({ title: "Dossier Validé", description: "Le dossier a été validé avec succès." });
-      window.location.reload();
+      queryClient.invalidateQueries({ queryKey: ['import-stats'] });
     } catch (error: any) {
       toast({ variant: "destructive", title: "Erreur", description: error.message || "Échec de la validation." });
     }
@@ -125,19 +126,26 @@ export default function DashboardImportation() {
             </CardHeader>
             <CardContent className="space-y-6">
               {stats?.dossiers && stats.dossiers.length > 0 ? (
-                stats.dossiers.map((d: any) => (
-                  <ImportItem 
-                    key={d.id}
-                    name={d.numero_dossier || `Dossier #${d.id.slice(0,8)}`} 
-                    vessel={d.navire_nom || "Navire en attente"} 
-                    product={d.carburant || "Produit mixte"} 
-                    progress={d.statut === 'en_transport' ? 65 : d.statut === 'receptionne' ? 100 : d.statut === 'arrive' ? 95 : 10} 
-                    status={d.statut}
-                    date={`ETA: ${d.date_arrivee_est ? format(new Date(d.date_arrivee_est), 'dd MMM') : 'À définir'}`}
-                    showTransmit={d.statut === 'en_preparation' && role === 'agent_suivi_cargaison'}
-                    onTransmit={() => handleTransmitToLegal(d.id)}
-                  />
-                ))
+                stats.dossiers.map((d: any) => {
+                  let progress = 10;
+                  if (d.statut === 'en_transport' || d.statut === 'en_transit' || d.statut === 'transit') progress = 65;
+                  if (d.statut === 'arrive_conakry' || d.statut === 'arrive' || d.statut === 'au_port') progress = 95;
+                  if (d.statut === 'receptionne') progress = 100;
+                  
+                  return (
+                    <ImportItem 
+                      key={d.id}
+                      name={d.numero_dossier || `Dossier #${d.id.slice(0,8)}`} 
+                      vessel={d.navire_nom || "Navire en attente"} 
+                      product={d.carburant || "Produit mixte"} 
+                      progress={progress} 
+                      status={d.statut}
+                      date={`ETA: ${d.date_arrivee_est ? format(new Date(d.date_arrivee_est), 'dd MMM') : 'À définir'}`}
+                      showTransmit={d.statut === 'en_preparation' && role === 'agent_suivi_cargaison'}
+                      onTransmit={() => handleTransmitToLegal(d.id)}
+                    />
+                  );
+                })
               ) : (
                 <>
                   <ImportItem 

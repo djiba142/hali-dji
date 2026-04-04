@@ -26,14 +26,14 @@ export default function DashboardLogistique() {
   const isLogOp = role === 'agent_logistique' || role === 'responsable_depots' || role === 'responsable_transport' || role === 'operateur_logistique';
   const isGuest = !['directeur_logistique', 'agent_logistique', 'responsable_depots', 'responsable_transport', 'operateur_logistique', 'super_admin'].includes(role || '');
 
-  const { data: stats, isLoading } = useQuery({
+  const { data: stats, isLoading, refetch } = useQuery({
     queryKey: ['logistique-dashboard-stats'],
     queryFn: async () => {
       const { data: allStocks } = await (supabase as any).from('logistique_stocks').select('*, produit:import_produits(nom)');
       const { data: depots } = await (supabase as any).from('logistique_depots').select('*');
       const { count: receptions } = await (supabase as any).from('logistique_receptions').select('*', { count: 'exact', head: true });
       const { data: distribution } = await (supabase as any).from('livraisons').select('*, station:stations(nom)').eq('statut', 'en_cours').limit(5);
-      const { data: incoming } = await (supabase as any).from('import_dossiers').select('*').in('statut', ['arrive_conakry', 'receptionne']).limit(3);
+      const { data: incoming } = await (supabase as any).from('importations').select('*').in('statut', ['transit', 'arrive_conakry', 'receptionne', 'en_route', 'au_port']).order('created_at', { ascending: false }).limit(3);
       const { data: demandes_dsa } = await (supabase as any).from('ordres_livraison').select('*, station:stations(nom, code)').eq('statut', 'en_attente').order('created_at', { ascending: false }).limit(4);
       
       const totalStock = allStocks?.reduce((acc: number, s: any) => acc + Number(s.quantite_disponible), 0) || 0;
@@ -48,7 +48,7 @@ export default function DashboardLogistique() {
       const { error } = await (supabase as any).from('import_dossiers').update({ statut: 'receptionne' }).eq('id', dossierId);
       if (error) throw error;
       toast({ title: "Réception Enregistrée", description: "Carburant transféré virtuellement vers vos dépôts stratégiques." });
-      window.location.reload();
+      refetch();
     } catch (err) {
       toast({ variant: "destructive", title: "Erreur", description: "Impossible d'enregistrer la réception." });
     }
@@ -56,22 +56,16 @@ export default function DashboardLogistique() {
 
   const handleDispatchTruck = async (orderId: string, qty: number, stationId: string, produit: string) => {
     try {
-      const { error: updErr } = await (supabase as any).from('ordres_livraison').update({ statut: 'approuve' }).eq('id', orderId);
-      if (updErr) throw updErr;
-
-      // Mocking a livraison injection
-      const { error: insErr } = await (supabase as any).from('livraisons').insert({
-        station_id: stationId,
-        quantite_prevue: qty,
-        statut: 'en_cours',
-        produit: produit || 'Gasoil',
-        camion_plaque: 'RC-' + Math.floor(1000 + Math.random() * 9000),
-        date_depart: new Date().toISOString()
+      const { error } = await (supabase as any).rpc('fn_dispatch_delivery', {
+          p_order_id: orderId,
+          p_station_id: stationId,
+          p_qty: qty,
+          p_produit: produit
       });
-      if (insErr) console.warn("Livraison insert skipped or failed", insErr);
+      if (error) throw error;
 
       toast({ title: "Camion Expédié", description: "Le DSA a été notifié de l'approche du camion." });
-      window.location.reload();
+      refetch();
     } catch (err) {
       toast({ variant: "destructive", title: "Erreur", description: "Erreur lors de l'expédition." });
     }
@@ -161,7 +155,7 @@ export default function DashboardLogistique() {
                             <div className="flex flex-col">
                               <span className="font-bold text-slate-900">{depot.nom}</span>
                               <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest flex items-center gap-1">
-                                <MapPin className="h-3 w-3" /> {depot.localisation}
+                                <MapPin className="h-3 w-3" /> {depot.region || depot.localisation}
                               </span>
                             </div>
                           </td>
@@ -177,7 +171,7 @@ export default function DashboardLogistique() {
                           <td className="px-6 py-4">
                             <div className="w-40 space-y-1.5">
                               <div className="flex justify-between text-[10px] font-bold">
-                                <span className="text-slate-500">{totalUsed.toLocaleString()} / {depot.capacite_totale?.toLocaleString()} MT</span>
+                                <span className="text-slate-500">{totalUsed.toLocaleString()} / {(depot.capacite_totale || depot.capacite_max || 1).toLocaleString()} MT</span>
                                 <span className={cn(usagePercent > 85 ? "text-red-600" : "text-emerald-600")}>{usagePercent}%</span>
                               </div>
                               <Progress value={usagePercent} className={cn("h-1.5", usagePercent > 85 ? "bg-red-100" : "bg-emerald-100")} />
@@ -274,12 +268,12 @@ export default function DashboardLogistique() {
                   stats.distribution.map((item: any) => (
                     <div key={item.id} className="p-3 rounded-xl bg-white shadow-sm border border-blue-100 flex items-center justify-between">
                       <div className="min-w-0">
-                        <p className="text-[10px] font-black uppercase text-blue-600">{item.produit}</p>
+                        <p className="text-[10px] font-black uppercase text-blue-600">{item.produit || item.carburant}</p>
                         <h4 className="text-xs font-bold text-slate-900 truncate">Vers {item.station?.nom}</h4>
-                        <p className="text-[9px] text-slate-400 font-medium">{item.camion_plaque}</p>
+                        <p className="text-[9px] text-slate-400 font-medium">{item.camion_plaque || item.camion_immatriculation}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-[10px] font-black text-slate-900">{item.quantite_prevue?.toLocaleString()} L</p>
+                        <p className="text-[10px] font-black text-slate-900">{(item.quantite_prevue || item.quantite)?.toLocaleString()} L</p>
                         <Badge className="bg-blue-50 text-blue-600 text-[8px] h-4">EN ROUTE</Badge>
                       </div>
                     </div>
