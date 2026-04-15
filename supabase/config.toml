@@ -1,1 +1,7 @@
-project_id = "pyfsyetzglmksphncags"
+project_id = "bjcnvbrcyezswdrefzgh"
+
+[functions.delete-user]
+verify_jwt = false
+
+[functions.create-user]
+verify_jwt = false
